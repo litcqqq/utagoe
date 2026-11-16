@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Update Status Card based on lastTrackStatus
   function updateStatusCard(trackStatus) {
     if (!trackStatus || !trackStatus.title) {
-      statusTrackName.textContent = 'Buka tab lirik di Spotify...';
+      statusTrackName.textContent = 'Buka tab lirik di Spotify / YT Music...';
       sourceBadge.textContent = 'Standby';
       sourceBadge.className = 'status-source-badge';
       return;

@@ -58,6 +58,10 @@ async function main() {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.strictEqual(manifest.manifest_version, 3, 'Must be Manifest V3');
     assert(manifest.host_permissions.includes('https://lrclib.net/*'), 'Must include lrclib.net in host permissions');
+    assert(manifest.host_permissions.includes('https://open.spotify.com/*'), 'Must include open.spotify.com in host permissions');
+    assert(manifest.host_permissions.includes('https://music.youtube.com/*'), 'Must include music.youtube.com in host permissions');
+    assert(manifest.content_scripts[0].matches.includes('https://music.youtube.com/*'), 'Must include music.youtube.com in content_scripts.matches');
+    assert(manifest.web_accessible_resources[0].matches.includes('https://music.youtube.com/*'), 'Must include music.youtube.com in web_accessible_resources.matches');
     
     // Check icons
     Object.values(manifest.icons).forEach(iconPath => {
@@ -216,6 +220,157 @@ async function main() {
     assert(htmlContent.includes('id="toggle-validator"'), 'Must have validator toggle in HTML');
     assert(htmlContent.includes('id="toggle-ateji"'), 'Must have ateji toggle in HTML');
     assert(htmlContent.includes('id="form-add-override"'), 'Must have custom override form in HTML');
+  });
+
+  // --- Test 7: Site Adapters (Spotify & YouTube Music) ---
+  test('7. Site adapters (Spotify & YouTube Music DOM, idempotency, and hooks)', () => {
+    const spotifyAdapter = require(path.join(DIST_DIR, 'content', 'sites', 'spotify.js'));
+    const ytmAdapter = require(path.join(DIST_DIR, 'content', 'sites', 'youtubemusic.js'));
+
+    assert(spotifyAdapter.matches('https://open.spotify.com/track/123'), 'Spotify adapter should match open.spotify.com');
+    assert(!spotifyAdapter.matches('https://music.youtube.com/watch?v=123'), 'Spotify adapter should not match music.youtube.com');
+    assert(ytmAdapter.matches('https://music.youtube.com/watch?v=123'), 'YTM adapter should match music.youtube.com');
+    assert(!ytmAdapter.matches('https://open.spotify.com/track/123'), 'YTM adapter should not match open.spotify.com');
+
+    // Layout nyata di music.youtube.com tidak selalu punya ytmusic-player-bar;
+    // metadata bisa berada di ytmusic-track-info (miniplayer / player page).
+    const mockPlayerDoc = {
+      title: 'Fallback Song - Fallback Artist - YouTube Music',
+      querySelector(sel) {
+        if (sel === 'ytmusic-track-info .ytmusicTrackInfoTitle') {
+          return { textContent: '夜に駆ける' };
+        }
+        if (sel === 'ytmusic-track-info .ytmusicTrackInfoByline') {
+          return { textContent: 'YOASOBI • 1B views • 3.5M likes' };
+        }
+        return null;
+      }
+    };
+    const info1 = ytmAdapter.getTrackInfo(mockPlayerDoc);
+    assert.strictEqual(info1.title, '夜に駆ける');
+    assert.strictEqual(info1.artist, 'YOASOBI');
+
+    // Varian layout lama dengan ytmusic-player-bar harus tetap dikenali
+    const mockBarDoc = {
+      title: 'Fallback Song - Fallback Artist - YouTube Music',
+      querySelector(sel) {
+        if (sel === 'ytmusic-player-bar #layout .title') {
+          return { textContent: '群青' };
+        }
+        if (sel === 'ytmusic-player-bar #layout .byline') {
+          return { textContent: 'YOASOBI • THE BOOK • 2021' };
+        }
+        return null;
+      }
+    };
+    const infoBar = ytmAdapter.getTrackInfo(mockBarDoc);
+    assert.strictEqual(infoBar.title, '群青');
+    assert.strictEqual(infoBar.artist, 'YOASOBI');
+
+    const mockFallbackDoc = {
+      title: '群青 - YOASOBI',
+      querySelector() { return null; }
+    };
+    const info2 = ytmAdapter.getTrackInfo(mockFallbackDoc);
+    assert.strictEqual(info2.title, '群青');
+    assert.strictEqual(info2.artist, 'YOASOBI');
+
+    // Wajib memeriksa page-type="MUSIC_PAGE_TYPE_TRACK_LYRICS" dan memilih elemen description terakhir
+    const firstDesc = {
+      className: 'description style-scope ytmusic-description-shelf-renderer',
+      textContent: '沈むように溶けてゆくように\r\n\r\n二人だけの空が広がる夜に',
+      attributes: {},
+      childNodes: []
+    };
+    const secondDesc = {
+      className: 'non-expandable description style-scope ytmusic-description-shelf-renderer',
+      textContent: '沈むように溶けてゆくように\r\n\r\n二人だけの空が広がる夜に',
+      attributes: {},
+      childNodes: [],
+      get children() {
+        return this.childNodes.filter(n => !n.nodeType || n.nodeType === 1);
+      },
+      setAttribute(k, v) { this.attributes[k] = String(v); },
+      getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attributes, k) ? this.attributes[k] : null; },
+      appendChild(c) { this.childNodes.push(c); return c; }
+    };
+
+    const nonLyricsDoc = {
+      querySelector() { return null; },
+      querySelectorAll() {
+        return [{ getAttribute: () => 'MUSIC_PAGE_TYPE_TRACK_DESCRIPTION' }];
+      }
+    };
+    assert.strictEqual(ytmAdapter.getLyricsContainer(nonLyricsDoc), null, 'Should ignore non-lyrics shelf');
+
+    const lyricsDoc = {
+      querySelector(sel) {
+        if (sel === 'ytmusic-description-shelf-renderer[page-type="MUSIC_PAGE_TYPE_TRACK_LYRICS"]') {
+          return {
+            querySelectorAll(sub) {
+              if (sub === 'yt-formatted-string.description') return [firstDesc, secondDesc];
+              return [];
+            }
+          };
+        }
+        return null;
+      }
+    };
+    const container = ytmAdapter.getLyricsContainer(lyricsDoc);
+    assert.strictEqual(container, secondDesc, 'Must select the LAST yt-formatted-string.description');
+
+    const rawLines = ytmAdapter.getLyricLines(container);
+    assert.deepStrictEqual(rawLines, ['沈むように溶けてゆくように', '', '二人だけの空が広がる夜に']);
+
+    const converted = [
+      { text: '沈むように溶けてゆくように', romaji: 'shizumu yō ni toke te yuku yō ni' },
+      { text: '', romaji: '' },
+      { text: '二人だけの空が広がる夜に', romaji: 'futari dake no sora ga hirogaru yoru ni' }
+    ];
+    ytmAdapter.applyRomaji(container, converted);
+
+    assert.strictEqual(container.children.length, 3, 'Should render 3 row divs (including empty spacer)');
+    assert.strictEqual(container.children[0].getAttribute('data-has-romaji'), 'true');
+    assert.strictEqual(container.children[0].childNodes[0].className, 'spotify-romaji-line');
+    assert.strictEqual(container.children[0].childNodes[0].textContent, 'shizumu yō ni toke te yuku yō ni');
+    assert.strictEqual(container.children[0].childNodes[1].textContent, '沈むように溶けてゆくように');
+    assert(container.children[1].className.includes('ytm-lyric-empty'), 'Middle line should be empty spacer');
+
+    // Idempoten: pemanggilan ulang tidak boleh membungkus ulang baris yang sudah diproses
+    ytmAdapter.applyRomaji(container, [
+      { text: '沈むように溶けてゆくように', romaji: 'DUPLICATE_SHOULD_NOT_APPLY' },
+      { text: '', romaji: '' },
+      { text: '二人だけの空が広がる夜に', romaji: 'DUPLICATE_SHOULD_NOT_APPLY' }
+    ]);
+    assert.strictEqual(container.children.length, 3, 'Row count must remain 3 on re-injection');
+    assert.strictEqual(container.children[0].childNodes.length, 2, 'Must not double-wrap row');
+    assert.strictEqual(container.children[0].childNodes[0].textContent, 'shizumu yō ni toke te yuku yō ni');
+    assert.deepStrictEqual(
+      ytmAdapter.getLyricLines(container),
+      ['沈むように溶けてゆくように', '', '二人だけの空が広がる夜に'],
+      'Original lines must be preserved after injection'
+    );
+
+    const listeners = {};
+    let hookCalls = 0;
+    const hookDoc = {
+      addEventListener(type, fn) { listeners[type] = fn; }
+    };
+    ytmAdapter.setupNavigationHooks(() => { hookCalls++; }, hookDoc);
+    assert(typeof listeners['yt-navigate-finish'] === 'function', 'Must register yt-navigate-finish listener');
+    assert(typeof listeners['click'] === 'function', 'Must register click listener for Lyrics tab');
+
+    listeners['yt-navigate-finish']();
+    assert(hookCalls >= 1, 'yt-navigate-finish should trigger pipeline');
+
+    const beforeClickCalls = hookCalls;
+    const lyricsTab = {
+      tagName: 'TP-YT-PAPER-TAB',
+      textContent: 'Lyrics',
+      getAttribute(k) { return k === 'aria-selected' ? 'true' : null; }
+    };
+    listeners['click']({ target: lyricsTab });
+    assert(hookCalls > beforeClickCalls, 'Clicking selected Lyrics tab should trigger pipeline');
   });
 
   console.log(`\nResults: ${passed}/${total} test suites passed cleanly.`);

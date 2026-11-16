@@ -41,6 +41,19 @@
   opacity: 1 !important;
 }
 
+/* Tata letak baris bertingkat pada YouTube Music */
+.ytm-lyric-line {
+  margin-bottom: 0.45em;
+}
+
+.ytm-lyric-empty {
+  min-height: 1.1em;
+}
+
+.ytm-original-line {
+  line-height: 1.4;
+}
+
 /* When the extension is toggled OFF by the user */
 body.spotify-romaji-disabled .spotify-romaji-line {
   display: none !important;

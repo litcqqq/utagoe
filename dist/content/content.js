@@ -1,30 +1,28 @@
 /**
- * Spotify Japanese Lyrics Romaji Extension
- * Stacked Romaji lyrics directly above Kanji/Kana original lyrics.
- * Includes 3-Tier Validation & Correction:
- *  - Tier 1: Lrclib Community-Verified Human Romaji
- *  - Tier 2: Local Song Ateji & Particle Rulebook
- *  - Tier 3: User Custom Dictionary Overrides
+ * Ekstensi Lirik Romaji Jepang untuk Spotify Web & YouTube Music
+ * Menampilkan Romaji bertingkat tepat di atas lirik asli Kanji/Kana.
+ * Dilengkapi Validasi & Koreksi 3 Lapis:
+ *  - Lapis 1: Lirik Romaji komunitas terverifikasi via Lrclib
+ *  - Lapis 2: Kamus Ateji & partikel lagu lokal
+ *  - Lapis 3: Kamus koreksi kustom pengguna
  */
 
 (function () {
   'use strict';
 
-  // State & Settings
   const state = {
     enabled: true,
     romajiSystem: 'hepburn', // 'hepburn' | 'passport'
     fontSizeRatio: 0.65,     // 0.50 - 0.90
     casing: 'normal',        // 'normal' | 'lowercase'
-    enableValidator: true,   // Lrclib community validator
-    enableAteji: true,       // Built-in song ateji rules
-    customOverrides: {},     // User custom word mappings { kanji: romaji }
-    
-    // Runtime track & validator state
+    enableValidator: true,
+    enableAteji: true,
+    customOverrides: {},
+
     currentTrackTitle: '',
     currentArtist: '',
-    verifiedLyrics: null,    // Lrclib verified lines if available
-    currentSource: 'kuroshiro', // 'lrclib' | 'kuroshiro'
+    verifiedLyrics: null,
+    currentSource: 'kuroshiro',
 
     kuroshiroReady: false,
     kuroshiroLoading: false,
@@ -34,15 +32,14 @@
 
   let kuroshiro = null;
   let analyzer = null;
+  let kuroshiroInitPromise = null;
 
-  // Detect Japanese characters (Kanji, Hiragana, Katakana)
   const JAPANESE_CHAR_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 
   function hasJapanese(text) {
-    return JAPANESE_CHAR_REGEX.test(text);
+    return JAPANESE_CHAR_REGEX.test(text || '');
   }
 
-  // Clean and format Romaji output
   function cleanRomaji(str) {
     if (!str) return '';
     return str
@@ -52,35 +49,33 @@
       .trim();
   }
 
-  // Extract Track Title and Artist from Spotify DOM
-  function getSpotifyTrackInfo() {
-    let title = '';
-    let artist = '';
-
-    const titleEl = document.querySelector('[data-testid="context-item-info-title"]');
-    if (titleEl) {
-      title = titleEl.innerText?.trim() || '';
-    }
-
-    const artistEl = document.querySelector('[data-testid="context-item-info-artist"], [data-testid="context-item-info-subtitles"]');
-    if (artistEl) {
-      artist = artistEl.innerText?.trim() || '';
-    }
-
-    if (!title) {
-      const parts = document.title.split(/[•\-–—|]/).map(s => s.trim()).filter(s => s && s.toLowerCase() !== 'spotify');
-      if (parts.length >= 2) {
-        title = parts[0];
-        artist = parts[1];
-      }
-    }
-
-    return { title, artist };
+  // Pilih adaptor situs yang cocok dengan URL aktif
+  function getActiveAdapter() {
+    const adapters = window.SiteAdapters || [
+      window.SpotifySiteAdapter,
+      window.YouTubeMusicSiteAdapter
+    ].filter(Boolean);
+    const url = window.location ? window.location.href : '';
+    return adapters.find(adapter => adapter && adapter.matches(url)) || null;
   }
 
-  // Check track changes and query Lrclib validator
+  function clearActiveRomaji(adapter, container) {
+    const targetAdapter = adapter || getActiveAdapter();
+    if (targetAdapter && typeof targetAdapter.clearRomaji === 'function') {
+      const targetContainer = container || targetAdapter.getLyricsContainer(document);
+      targetAdapter.clearRomaji(targetContainer, document);
+      return;
+    }
+    document.querySelectorAll('.spotify-romaji-line').forEach(el => el.remove());
+    document.querySelectorAll('[data-has-romaji]').forEach(el => el.removeAttribute('data-has-romaji'));
+  }
+
+  // Periksa pergantian lagu dan kueri validator Lrclib
   async function checkTrackUpdate() {
-    const { title, artist } = getSpotifyTrackInfo();
+    const adapter = getActiveAdapter();
+    if (!adapter) return;
+
+    const { title, artist } = adapter.getTrackInfo(document);
     if (!title) return;
 
     if (title === state.currentTrackTitle && artist === state.currentArtist) {
@@ -98,14 +93,13 @@
         if (verified && (verified.syncedLines || verified.plainLines)) {
           state.verifiedLyrics = verified;
           state.currentSource = 'lrclib';
-          console.log(`[Spotify-Romaji] Verified community lyrics found for "${title}" via Lrclib!`);
+          clearActiveRomaji(adapter);
         }
       } catch (err) {
-        console.warn('[Spotify-Romaji] Validator check error:', err);
+        console.warn('[Lyrics-Romaji] Validator check error:', err);
       }
     }
 
-    // Save status for popup badge
     chrome.storage.local.set({
       lastTrackStatus: {
         title: state.currentTrackTitle,
@@ -117,40 +111,40 @@
     scheduleScan();
   }
 
-  // Initialize Kuroshiro with local Kuromoji dictionary
+  // Inisialisasi Kuroshiro dengan kamus Kuromoji lokal
   async function initKuroshiro() {
     if (state.kuroshiroReady) return true;
-    if (state.kuroshiroLoading) return false;
+    if (kuroshiroInitPromise) return kuroshiroInitPromise;
 
     state.kuroshiroLoading = true;
 
-    try {
-      if (typeof window.Kuroshiro === 'undefined' || typeof window.KuromojiAnalyzer === 'undefined') {
-        state.kuroshiroLoading = false;
+    kuroshiroInitPromise = (async () => {
+      try {
+        if (typeof window.Kuroshiro === 'undefined' || typeof window.KuromojiAnalyzer === 'undefined') {
+          return false;
+        }
+
+        kuroshiro = new window.Kuroshiro();
+        const dictPath = chrome.runtime.getURL('dict/');
+        analyzer = new window.KuromojiAnalyzer({ dictPath });
+
+        await kuroshiro.init(analyzer);
+        state.kuroshiroReady = true;
+        return true;
+      } catch (err) {
+        console.error('[Lyrics-Romaji] Failed to initialize Kuroshiro:', err);
         return false;
+      } finally {
+        state.kuroshiroLoading = false;
+        kuroshiroInitPromise = null;
       }
+    })();
 
-      kuroshiro = new window.Kuroshiro();
-      const dictPath = chrome.runtime.getURL('dict/');
-      analyzer = new window.KuromojiAnalyzer({ dictPath });
-
-      await kuroshiro.init(analyzer);
-      state.kuroshiroReady = true;
-      state.kuroshiroLoading = false;
-      console.log('[Spotify-Romaji] Morphological engine ready with local dictionary.');
-      
-      scanAndProcessLyrics();
-      return true;
-    } catch (err) {
-      console.error('[Spotify-Romaji] Failed to initialize Kuroshiro:', err);
-      state.kuroshiroLoading = false;
-      return false;
-    }
+    return kuroshiroInitPromise;
   }
 
-  // Convert a single line with caching & Ateji / Overrides
+  // Konversi satu baris lirik dengan cache, Ateji, dan kamus pengguna
   async function convertToRomaji(japaneseText, lineIndex) {
-    // 1. Check Lrclib verified community lyrics first
     if (state.verifiedLyrics) {
       const v = state.verifiedLyrics;
       let verifiedLine = '';
@@ -161,20 +155,18 @@
       }
 
       if (verifiedLine && verifiedLine.length > 0) {
-        // Apply any user custom overrides on top of community lyrics if desired
         if (window.LyricAteji) {
           verifiedLine = window.LyricAteji.applyAtejiAndOverrides(
             japaneseText,
             verifiedLine,
             state.customOverrides,
-            false // Ateji already in community lyrics
+            false
           );
         }
         return cleanRomaji(verifiedLine);
       }
     }
 
-    // 2. Fallback to Kuroshiro + Ateji engine
     const cacheKey = `${japaneseText}:${state.romajiSystem}:${JSON.stringify(state.customOverrides)}:${state.enableAteji}`;
     if (state.cache.has(cacheKey)) {
       return state.cache.get(cacheKey);
@@ -199,7 +191,6 @@
 
         let formatted = cleanRomaji(rawResult);
 
-        // Apply Layer 2 (Ateji) & Layer 3 (User Overrides)
         if (window.LyricAteji) {
           formatted = window.LyricAteji.applyAtejiAndOverrides(
             japaneseText,
@@ -212,7 +203,7 @@
         state.cache.set(cacheKey, formatted);
         return formatted;
       } catch (err) {
-        console.error('[Spotify-Romaji] Conversion error for line:', japaneseText, err);
+        console.error('[Lyrics-Romaji] Conversion error for line:', japaneseText, err);
         return null;
       } finally {
         state.conversionQueue.delete(cacheKey);
@@ -223,7 +214,6 @@
     return task;
   }
 
-  // Apply CSS variables to root
   function updateCSSVariables() {
     document.documentElement.style.setProperty(
       '--spotify-romaji-font-size',
@@ -236,104 +226,58 @@
     }
   }
 
-  // Extract original text from line element
-  function extractOriginalText(lineEl) {
-    const existingRomaji = lineEl.querySelector('.spotify-romaji-line');
-    let text = '';
-    for (let node of lineEl.childNodes) {
-      if (node !== existingRomaji && node.textContent) {
-        text += node.textContent;
-      }
-    }
-    return text.trim();
-  }
+  // Pindai dan proses seluruh baris lirik yang tampak melalui adaptor situs aktif
+  async function scanAndProcessLyrics() {
+    const adapter = getActiveAdapter();
+    if (!adapter) return;
 
-  // Process a single lyric line element
-  async function processLineElement(lineEl, index) {
-    if (!state.enabled) {
-      const existing = lineEl.querySelector('.spotify-romaji-line');
-      if (existing) existing.remove();
-      lineEl.removeAttribute('data-has-romaji');
-      return;
-    }
-
-    const originalText = extractOriginalText(lineEl);
-    if (!originalText || !hasJapanese(originalText)) {
-      return;
-    }
-
-    lineEl.setAttribute('data-has-romaji', 'true');
-
-    const romaji = await convertToRomaji(originalText, index);
-    if (!romaji) return;
-
-    let displayRomaji = romaji;
-    if (state.casing === 'lowercase') {
-      displayRomaji = displayRomaji.toLowerCase();
-    }
-
-    let romajiEl = lineEl.querySelector('.spotify-romaji-line');
-    if (!romajiEl) {
-      romajiEl = document.createElement('div');
-      romajiEl.className = 'spotify-romaji-line';
-      romajiEl.setAttribute('dir', 'auto');
-      romajiEl.setAttribute('aria-hidden', 'true');
-      lineEl.prepend(romajiEl);
-    }
-
-    if (romajiEl.textContent !== displayRomaji) {
-      romajiEl.textContent = displayRomaji;
-    }
-  }
-
-  // Find all lyric lines
-  function getLyricLines() {
-    let lines = Array.from(document.querySelectorAll(
-      '[data-testid="lyrics-line"], [data-testid="fullscreen-lyric-line"], .lyrics-lyricsContent-lyric'
-    ));
-
-    if (lines.length > 0) {
-      return lines;
-    }
-
-    const container = document.querySelector(
-      '[data-testid="lyrics-container"], [data-testid="fullscreen-lyric"], .lyrics-lyricsContainer-LyricsBackground'
-    );
-
-    if (container) {
-      const candidates = Array.from(container.querySelectorAll('div[dir="auto"], p[dir="auto"]'));
-      return candidates.filter(el => {
-        const text = el.innerText?.trim();
-        return text && text.length > 0 && el.childElementCount <= 2;
-      });
-    }
-
-    return [];
-  }
-
-  // Scan and process all visible lyric lines
-  function scanAndProcessLyrics() {
     checkTrackUpdate();
 
-    const lines = getLyricLines();
-    if (lines.length === 0) return;
+    const container = adapter.getLyricsContainer(document);
+    if (!container) return;
 
-    let foundJapanese = false;
-    for (const line of lines) {
-      const text = extractOriginalText(line);
-      if (hasJapanese(text)) {
-        foundJapanese = true;
-        break;
-      }
+    if (!state.enabled) {
+      clearActiveRomaji(adapter, container);
+      return;
     }
 
-    if (foundJapanese && !state.kuroshiroReady && !state.kuroshiroLoading) {
-      initKuroshiro();
+    if (typeof adapter.needsProcessing === 'function' && !adapter.needsProcessing(container, hasJapanese)) {
+      return;
     }
 
-    lines.forEach((line, index) => {
-      processLineElement(line, index);
-    });
+    const rawLines = adapter.getLyricLines(container, document);
+    if (!rawLines || rawLines.length === 0) return;
+
+    const foundJapanese = rawLines.some(line => hasJapanese(line));
+    if (!foundJapanese) return;
+
+    if (!state.kuroshiroReady) {
+      const ready = await initKuroshiro();
+      if (!ready) return;
+    }
+
+    let lyricIndex = 0;
+    const convertedLines = await Promise.all(
+      rawLines.map(async (text) => {
+        const trimmed = (text || '').trim();
+        if (!trimmed) {
+          return { text: text || '', romaji: '' };
+        }
+        const idx = lyricIndex++;
+        if (!hasJapanese(trimmed)) {
+          return { text, romaji: '' };
+        }
+        const romaji = await convertToRomaji(trimmed, idx);
+        if (!romaji) {
+          return { text, romaji: '' };
+        }
+        const displayRomaji = state.casing === 'lowercase' ? romaji.toLowerCase() : romaji;
+        return { text, romaji: displayRomaji };
+      })
+    );
+
+    if (!state.enabled) return;
+    adapter.applyRomaji(container, convertedLines);
   }
 
   let scanTimeout = null;
@@ -344,23 +288,39 @@
     });
   }
 
-  // Setup DOM MutationObserver
   function initObserver() {
+    const adapter = getActiveAdapter();
+    if (adapter && typeof adapter.setupNavigationHooks === 'function') {
+      adapter.setupNavigationHooks(scheduleScan, document);
+    }
+
     const observer = new MutationObserver((mutations) => {
+      const currentAdapter = getActiveAdapter();
+      if (!currentAdapter) return;
+
       let shouldScan = false;
       for (const m of mutations) {
         if (m.type === 'childList' && m.addedNodes.length > 0) {
           for (const node of m.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
               if (
-                node.matches?.('[data-testid="lyrics-line"], [data-testid="fullscreen-lyric-line"], [data-testid="lyrics-container"], [data-testid="fullscreen-lyric"], [data-testid="now-playing-widget"]') ||
-                node.querySelector?.('[data-testid="lyrics-line"], [data-testid="fullscreen-lyric-line"], [dir="auto"]')
+                typeof currentAdapter.shouldTriggerOnMutation === 'function' &&
+                currentAdapter.shouldTriggerOnMutation(node)
               ) {
                 shouldScan = true;
                 break;
               }
             }
           }
+        } else if (
+          m.type === 'attributes' &&
+          m.attributeName === 'aria-selected' &&
+          m.target &&
+          m.target.getAttribute('aria-selected') === 'true' &&
+          typeof currentAdapter.isLyricsTab === 'function' &&
+          currentAdapter.isLyricsTab(m.target)
+        ) {
+          shouldScan = true;
         }
         if (shouldScan) break;
       }
@@ -372,25 +332,31 @@
 
     observer.observe(document.body, {
       childList: true,
-      subtree: true
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-selected']
     });
 
+    // Polling cadangan yang ringan: keluar lebih awal jika shelf/kontainer lirik tidak ada
     setInterval(() => {
+      const currentAdapter = getActiveAdapter();
+      if (!currentAdapter) return;
+
+      const container = currentAdapter.getLyricsContainer(document);
+      if (!container) return;
+
       checkTrackUpdate();
-      const lines = getLyricLines();
-      if (lines.length > 0) {
-        const needsProcessing = lines.some(line => {
-          const text = extractOriginalText(line);
-          return hasJapanese(text) && !line.querySelector('.spotify-romaji-line');
-        });
-        if (needsProcessing) {
-          scheduleScan();
-        }
+
+      if (
+        state.enabled &&
+        typeof currentAdapter.needsProcessing === 'function' &&
+        currentAdapter.needsProcessing(container, hasJapanese)
+      ) {
+        scheduleScan();
       }
     }, 1500);
   }
 
-  // Load and listen to settings
   function initSettings() {
     chrome.storage.local.get([
       'enabled',
@@ -422,8 +388,7 @@
         state.enabled = changes.enabled.newValue;
         updateCSSVariables();
         if (!state.enabled) {
-          document.querySelectorAll('.spotify-romaji-line').forEach(el => el.remove());
-          document.querySelectorAll('[data-has-romaji]').forEach(el => el.removeAttribute('data-has-romaji'));
+          clearActiveRomaji();
         } else {
           needsReconversion = true;
         }
@@ -462,17 +427,16 @@
 
       if (needsReconversion && state.enabled) {
         state.cache.clear();
+        clearActiveRomaji();
         scheduleScan();
       }
     });
   }
 
-  // Bootstrapping
   function start() {
     initSettings();
     initObserver();
     scheduleScan();
-    console.log('[Spotify-Romaji] Extension active with 3-Layer Validator pipeline.');
   }
 
   if (document.readyState === 'loading') {

@@ -1,6 +1,6 @@
-# Spotify Lyrics Romaji Browser Extension 🎵🇯🇵
+# Spotify & YouTube Music Lyrics Romaji Browser Extension 🎵🇯🇵
 
-Ekstensi browser (Google Chrome, Microsoft Edge, Brave, Opera) berbasis **Manifest V3** yang secara otomatis mengonversi dan menampilkan lirik lagu Jepang berhuruf Kanji/Kana ke dalam **Romaji**, dengan format **dua baris bertingkat (Stacked Line)** di mana teks Romaji berada tepat di atas lirik aslinya.
+Ekstensi browser (Google Chrome, Microsoft Edge, Brave, Opera) berbasis **Manifest V3** yang secara otomatis mengonversi dan menampilkan lirik lagu Jepang berhuruf Kanji/Kana ke dalam **Romaji** pada **Spotify Web Player** (`open.spotify.com`) dan **YouTube Music** (`music.youtube.com`), dengan format **dua baris bertingkat (Stacked Line)** di mana teks Romaji berada tepat di atas lirik aslinya.
 
 Dilengkapi dengan **3-Layer Validation & Correction Engine** untuk mencegah kesalahan baca (*miss transliteration*) akibat fenomena **Ateji (当て字)** dalam lirik lagu Jepang.
 
@@ -74,6 +74,23 @@ Folder hasil build siap pasang berada di direktori [`dist/`](dist).
    沈むように溶けてゆくように           <-- [Kanji asli di bawah]
    ```
 5. Buka popup ekstensi di toolbar browser untuk melihat status validasi lagu atau menambahkan koreksi kata jika ada kata yang ingin disesuaikan.
+
+## Cara Penggunaan di YouTube Music
+
+1. Buka [YouTube Music](https://music.youtube.com) dan putar lagu berbahasa Jepang.
+2. Buka halaman pemutar lagu, lalu klik tab **Lyrics** di panel samping. Dukungan YouTube Music mengharuskan tab **Lyrics** dibuka terlebih dahulu, karena kontainer lirik baru dirender oleh halaman setelah tab tersebut diaktifkan.
+3. Setiap baris lirik Jepang akan otomatis ditampilkan bertingkat dengan Romaji di bagian atas dan teks asli Jepang di bagian bawah.
+4. Saat berpindah lagu, ekstensi memindai ulang secara otomatis (hook `yt-navigate-finish`, klik tab Lyrics, `MutationObserver`, dan polling 1,5 detik). Jika tab **Lyrics** sempat tertutup atau lirik belum muncul, buka kembali tab tersebut.
+
+---
+
+## Batasan yang Diketahui (Limitations)
+
+- Hanya untuk **versi web desktop** (`music.youtube.com`), bukan aplikasi desktop atau mobile YouTube Music.
+- Lirik harus tersedia dari YouTube Music untuk lagu tersebut; jika lagu tidak punya lirik, tidak ada yang bisa di-*romanisasi*.
+- **Click-to-seek** (klik baris lirik untuk melompat ke detik tertentu) saat ini hanya berfungsi di Spotify, belum di YouTube Music.
+- Tampilan lirik **full-screen** YouTube Music memakai komponen berbeda dan belum diberi gaya bertingkat; yang didukung adalah panel lirik di samping pemutar.
+- Metadata lagu (judul/artis) dibaca dari `ytmusic-track-info`; layout lama yang memakai `ytmusic-player-bar` tetap didukung sebagai cadangan.
 
 ---
 
