@@ -19,10 +19,9 @@
     enableAteji: true,
     customOverrides: {},
 
-    outputMode: 'romaji',        // 'romaji' | 'hiragana' | 'katakana' | 'furigana'
+    outputMode: 'romaji',        // 'romaji' | 'hiragana' | 'katakana' | 'furigana' | 'translate'
     tapToFix: true,              // tap a word to correct its reading
     showBadges: true,            // per-line confidence dot
-    translationEnabled: false,   // stacked translation line
     translationLang: 'en',
 
     currentTrackTitle: '',
@@ -108,6 +107,7 @@
   }
 
   function clearActiveRomaji(adapter, container) {
+    document.querySelectorAll('.utagoe-badge').forEach(el => el.remove());
     const targetAdapter = adapter || getActiveAdapter();
     if (targetAdapter && typeof targetAdapter.clearRomaji === 'function') {
       const targetContainer = container || targetAdapter.getLyricsContainer(document);
@@ -340,7 +340,10 @@
     }
 
     const trimmed = plain.trim().replace(/\s+([,.!?;:])/g, '$1');
-    return { text: withCasing(trimmed), html: pieces.join('') };
+    return {
+      text: withCasing(trimmed),
+      html: mode === 'translate' ? '' : pieces.join('')
+    };
   }
 
   function escapeHtml(text) {
@@ -361,7 +364,7 @@
       const trimmed = text.trim();
 
       if (!trimmed || !hasJapanese(trimmed)) {
-        results[i] = { text, romaji: '', output: '', html: '', badge: '', translation: '' };
+        results[i] = { text, romaji: '', output: '', html: '', badge: '' };
         continue;
       }
 
@@ -377,16 +380,16 @@
         : [];
 
       if (!tokens || tokens.length === 0) {
-        results[i] = { text, romaji: '', output: '', html: '', badge: '', translation: '' };
+        results[i] = { text, romaji: '', output: '', html: '', badge: '' };
         continue;
       }
 
       const view = buildLineView(tokens, state.casing);
       // `romaji` stays the plain romaji string because the adapters and the
       // idempotency check still compare against it.
-      const romajiText = state.outputMode === 'romaji'
+      const romajiText = (state.outputMode === 'romaji' || state.outputMode === 'translate')
         ? view.text
-        : (await convertToRomaji(trimmed, idx)) || '';
+        : (await convertToRomaji(trimmed, idx)) || view.text || '';
 
       results[i] = {
         text,
@@ -394,8 +397,9 @@
         output: view.text,
         html: view.html,
         mode: state.outputMode,
-        confBadge: state.showBadges ? window.LyricReadings.lineConfidence(tokens) : '',
-        translation: '',
+        confBadge: (state.showBadges && state.outputMode !== 'translate')
+          ? window.LyricReadings.lineConfidence(tokens)
+          : '',
         tokens
       };
     }
@@ -403,12 +407,18 @@
     return results;
   }
 
-  // Fill in translations for the lines that need them. Failure is silent: a
-  // missing translation must never take the romaji line down with it.
-  async function attachTranslations(lines) {
-    if (!state.translationEnabled || !window.LyricTranslate) return lines;
+  // Replace romaji in place when display mode is translation. Failure is silent:
+  // a missing translation falls back to the plain romaji already on the line.
+  async function applyTranslationMode(lines) {
+    if (state.outputMode !== 'translate' || !window.LyricTranslate) return lines;
 
     const sources = lines.map((line) => (line.tokens && line.tokens.length ? line.text : ''));
+    for (let i = 0; i < lines.length; i++) {
+      if (!sources[i]) continue;
+      lines[i].html = '';
+      lines[i].confBadge = '';
+      lines[i].mode = 'translation';
+    }
     if (!sources.some(Boolean)) return lines;
 
     try {
@@ -416,8 +426,14 @@
         targetLang: state.translationLang
       });
       for (let i = 0; i < lines.length; i++) {
-        const value = translated[i];
-        if (typeof value === 'string' && value.trim()) lines[i].translation = value.trim();
+        if (!sources[i]) continue;
+        const value = translated && translated[i];
+        if (typeof value === 'string' && value.trim()) {
+          lines[i].romaji = value.trim();
+        }
+        lines[i].html = '';
+        lines[i].confBadge = '';
+        lines[i].mode = 'translation';
       }
     } catch (err) {
       console.warn('[Utagoe] Translation unavailable:', err && err.message);
@@ -429,13 +445,13 @@
   /**
    * The site adapters own the plain stacked romaji line. Everything that needs
    * structure the adapters do not model — rich markup per word, the confidence
-   * dot, the translation line, and tap targets — is attached here afterwards,
-   * by locating the romaji elements the adapter just wrote and upgrading them
-   * in place. Keeping this separate means a site redesign only breaks one
-   * unwrapping rule instead of the whole render path.
+   * dot, and tap targets — is attached here afterwards, by locating the romaji
+   * elements the adapter just wrote and upgrading them in place. Keeping this
+   * separate means a site redesign only breaks one unwrapping rule instead of
+   * the whole render path.
    */
   function applyInteractionLayer(lines) {
-    const needsRich = state.outputMode !== 'romaji' || state.translationEnabled ||
+    const needsRich = state.outputMode !== 'romaji' ||
       state.showBadges || state.tapToFix;
     if (!needsRich) return;
 
@@ -451,11 +467,10 @@
       if (!line || !line.tokens || line.tokens.length === 0) continue;
 
       upgradeRomajiElement(el, line, doc);
-      applyTranslationLine(el, line, doc);
       applyConfidenceBadge(el, line, doc);
     }
 
-    if (state.tapToFix) bindTapHandler(doc);
+    if (state.tapToFix && state.outputMode !== 'translate') bindTapHandler(doc);
   }
 
   // Replace the adapter's plain text with per-word markup so words can be
@@ -465,13 +480,20 @@
 
     // Marked managed so the site adapter stops overwriting textContent with the
     // plain romaji once richer markup is in place.
-    if (wantHtml) el.setAttribute('data-utagoe-managed', 'true');
-
-    // Compare the markup itself, never a signature: the site adapter rewrites
-    // textContent on each pass, so a signature-only guard would leave the plain
-    // romaji in place and the richer markup would never be restored.
-    if (wantHtml && el.innerHTML !== wantHtml) {
-      el.innerHTML = wantHtml;
+    if (wantHtml) {
+      el.setAttribute('data-utagoe-managed', 'true');
+      // Compare the markup itself, never a signature: the site adapter rewrites
+      // textContent on each pass, so a signature-only guard would leave the plain
+      // romaji in place and the richer markup would never be restored.
+      if (el.innerHTML !== wantHtml) {
+        el.innerHTML = wantHtml;
+      }
+    } else {
+      el.removeAttribute('data-utagoe-managed');
+      if (el.innerHTML) el.innerHTML = '';
+      if (line.romaji && el.textContent !== line.romaji) {
+        el.textContent = line.romaji;
+      }
     }
 
     if (line.mode === 'furigana') {
@@ -479,30 +501,6 @@
     } else {
       el.classList.remove('utagoe-furigana');
     }
-  }
-
-  // The translation line sits below the original text, which visually groups it
-  // with the lyric it explains rather than with the romaji above it.
-  function applyTranslationLine(romajiEl, line, doc) {
-    const parent = romajiEl.parentElement;
-    if (!parent) return;
-
-    let el = parent.querySelector(':scope > .utagoe-translation-line');
-    const text = line.translation || '';
-
-    if (!text) {
-      if (el) el.remove();
-      return;
-    }
-
-    if (!el) {
-      el = doc.createElement('div');
-      el.className = 'utagoe-translation-line';
-      el.setAttribute('dir', 'auto');
-      el.setAttribute('aria-hidden', 'true');
-      parent.appendChild(el);
-    }
-    if (el.textContent !== text) el.textContent = text;
   }
 
   const BADGE_LABELS = {
@@ -541,6 +539,7 @@
     tapHandlerBound = true;
 
     doc.addEventListener('click', (event) => {
+      if (state.outputMode === 'translate' || !state.tapToFix) return;
       const target = event.target;
       if (!target || typeof target.closest !== 'function') return;
       const word = target.closest('.utagoe-word');
@@ -718,7 +717,7 @@
     }
 
     const convertedLines = await buildConvertedLines(rawLines);
-    await attachTranslations(convertedLines);
+    await applyTranslationMode(convertedLines);
 
     if (!state.enabled) return;
     state.lastLines = convertedLines.filter((line) => line.tokens && line.tokens.length);
@@ -843,7 +842,6 @@
       'outputMode',
       'tapToFix',
       'showBadges',
-      'translationEnabled',
       'translationLang'
     ], (res) => {
       if (res.enabled !== undefined) state.enabled = res.enabled;
@@ -856,7 +854,6 @@
       if (res.outputMode) state.outputMode = res.outputMode;
       if (res.tapToFix !== undefined) state.tapToFix = res.tapToFix;
       if (res.showBadges !== undefined) state.showBadges = res.showBadges;
-      if (res.translationEnabled !== undefined) state.translationEnabled = res.translationEnabled;
       if (res.translationLang) state.translationLang = res.translationLang;
 
       updateCSSVariables();
@@ -924,11 +921,6 @@
         needsReconversion = true;
       }
 
-      if (changes.translationEnabled) {
-        state.translationEnabled = changes.translationEnabled.newValue === true;
-        needsReconversion = true;
-      }
-
       if (changes.translationLang) {
         state.translationLang = changes.translationLang.newValue || 'en';
         if (window.LyricTranslate) window.LyricTranslate.clearCache();
@@ -975,8 +967,10 @@
     window.__utagoeInternals = {
       state,
       buildLineView,
+      buildConvertedLines,
+      applyTranslationMode,
+      applyInteractionLayer,
       upgradeRomajiElement,
-      applyTranslationLine,
       applyConfidenceBadge,
       openReadingEditor,
       closeReadingEditor,

@@ -33,7 +33,6 @@ function createChromeStub(settings) {
     outputMode: 'romaji',
     tapToFix: true,
     showBadges: true,
-    translationEnabled: false,
     translationLang: 'en'
   }, settings || {});
 
@@ -270,19 +269,156 @@ async function main() {
     assert(badges[0].title.length > 0, 'badge has no accessible title');
   });
 
-  check('a translation line is inserted under the lyric', () => {
-    const line = { translation: 'As if sinking, as if melting away' };
-    internals.applyTranslationLine(lineEl, line, doc);
-    const translations = doc.querySelectorAll('.utagoe-translation-line');
-    assert(translations.length === 1, `expected 1 translation line, got ${translations.length}`);
-    assert(translations[0].textContent.includes('sinking'), 'translation text missing');
+  // -------------------------------------------------------------------------
+  console.log('\nTranslation display mode (in-place, no extra DOM nodes)');
+  // -------------------------------------------------------------------------
+
+  const rawLines = ['沈むように溶けてゆくように', '', '誰かの心臓になれたなら'];
+  const nonEmptyJpCount = rawLines.filter((l) => l && l.trim().length > 0).length;
+  const realTranslateLines = sandbox.window.LyricTranslate.translateLines;
+
+  // Establish romaji-mode baseline across the full pipeline
+  internals.state.outputMode = 'romaji';
+  internals.state.showBadges = true;
+  const romajiConverted = await internals.buildConvertedLines(rawLines);
+  await internals.applyTranslationMode(romajiConverted);
+  adapter.applyRomaji(page, romajiConverted);
+  internals.applyInteractionLayer(romajiConverted);
+
+  const romajiBaselineCount = doc.querySelectorAll('.spotify-romaji-line').length;
+  const romajiBaselineChildCounts = page._children.map((row) => row.childElementCount);
+
+  // Set up furigana class on lineEl first so we also verify mode switch cleans it up
+  lineEl.classList.add('utagoe-furigana');
+
+  await checkAsync('in outputMode translate, rendered line text equals the translated string', async () => {
+    internals.state.outputMode = 'translate';
+    internals.state.translationLang = 'en';
+    sandbox.window.LyricTranslate.translateLines = async (sources) =>
+      sources.map((src, i) => {
+        if (!src) return '';
+        return i === 0
+          ? 'As if sinking, as if melting away'
+          : "If I could become someone's heart";
+      });
+
+    const converted = await internals.buildConvertedLines(rawLines);
+    await internals.applyTranslationMode(converted);
+    adapter.applyRomaji(page, converted);
+    internals.applyInteractionLayer(converted);
+
+    const els = doc.querySelectorAll('.spotify-romaji-line');
+    assert(els.length === 2, `expected 2 rendered lines, got ${els.length}`);
+    assert(
+      els[0].textContent === 'As if sinking, as if melting away',
+      `line 0 mismatch: "${els[0].textContent}"`
+    );
+    assert(
+      els[1].textContent === "If I could become someone's heart",
+      `line 1 mismatch: "${els[1].textContent}"`
+    );
   });
 
-  check('clearing the translation removes the element', () => {
-    internals.applyTranslationLine(lineEl, { translation: '' }, doc);
-    const translations = doc.querySelectorAll('.utagoe-translation-line');
-    assert(translations.length === 0, `translation line not removed (${translations.length})`);
+  check('no extra node: zero .utagoe-translation-line elements and no more children than romaji baseline', () => {
+    const extraLines = doc.querySelectorAll('.utagoe-translation-line');
+    assert(extraLines.length === 0, `expected 0 .utagoe-translation-line, got ${extraLines.length}`);
+
+    page._children.forEach((row, idx) => {
+      assert(
+        row.childElementCount <= romajiBaselineChildCounts[idx],
+        `row ${idx} gained children: ${row.childElementCount} > baseline ${romajiBaselineChildCounts[idx]}`
+      );
+    });
+    assert(page._children[0].childElementCount === 1, `expected 1 child in row 0, got ${page._children[0].childElementCount}`);
+    assert(page._children[1].childElementCount === 0, `expected 0 children in empty row 1, got ${page._children[1].childElementCount}`);
+    assert(page._children[2].childElementCount === 1, `expected 1 child in row 2, got ${page._children[2].childElementCount}`);
   });
+
+  check('line count invariant: rendered romaji elements equal non-empty Japanese source lines in romaji and translate modes', () => {
+    const translateCount = doc.querySelectorAll('.spotify-romaji-line').length;
+    assert(romajiBaselineCount === nonEmptyJpCount, `romaji count ${romajiBaselineCount} !== ${nonEmptyJpCount}`);
+    assert(translateCount === nonEmptyJpCount, `translate count ${translateCount} !== ${nonEmptyJpCount}`);
+  });
+
+  check('translate mode attaches no confidence badge and removes mode leftovers', () => {
+    const badges = doc.querySelectorAll('.utagoe-badge');
+    assert(badges.length === 0, `expected 0 badges in translate mode, got ${badges.length}`);
+    const els = doc.querySelectorAll('.spotify-romaji-line');
+    for (const el of els) {
+      assert(!el.classList.contains('utagoe-furigana'), 'utagoe-furigana class left on element');
+      assert(el.getAttribute('data-utagoe-managed') === null, 'data-utagoe-managed left on element');
+      assert(el.innerHTML === '', `expected empty innerHTML in translate mode, got "${el.innerHTML}"`);
+    }
+  });
+
+  await checkAsync('failed or empty translation falls back to romaji text rather than an empty row', async () => {
+    internals.state.outputMode = 'translate';
+
+    // Case 1: empty strings returned
+    sandbox.window.LyricTranslate.translateLines = async (sources) => sources.map(() => '');
+    let converted = await internals.buildConvertedLines(rawLines);
+    await internals.applyTranslationMode(converted);
+    adapter.applyRomaji(page, converted);
+    internals.applyInteractionLayer(converted);
+
+    let els = doc.querySelectorAll('.spotify-romaji-line');
+    assert(els.length === nonEmptyJpCount, `expected ${nonEmptyJpCount} elements on empty fallback, got ${els.length}`);
+    assert(els[0].textContent === romajiConverted[0].romaji && els[0].textContent.toLowerCase().includes('shizumu'), `expected romaji fallback on line 0, got "${els[0].textContent}"`);
+    assert(els[1].textContent === romajiConverted[2].romaji && els[1].textContent.toLowerCase().includes('dare'), `expected romaji fallback on line 1, got "${els[1].textContent}"`);
+
+    // Case 2: translateLines throws
+    sandbox.window.LyricTranslate.translateLines = async () => {
+      throw new Error('simulated translation failure');
+    };
+    converted = await internals.buildConvertedLines(rawLines);
+    await internals.applyTranslationMode(converted);
+    adapter.applyRomaji(page, converted);
+    internals.applyInteractionLayer(converted);
+
+    els = doc.querySelectorAll('.spotify-romaji-line');
+    assert(els.length === nonEmptyJpCount, `expected ${nonEmptyJpCount} elements on error fallback, got ${els.length}`);
+    assert(els[0].textContent === romajiConverted[0].romaji && els[0].textContent.toLowerCase().includes('shizumu'), `expected romaji fallback on throw (line 0), got "${els[0].textContent}"`);
+    assert(els[1].textContent === romajiConverted[2].romaji && els[1].textContent.toLowerCase().includes('dare'), `expected romaji fallback on throw (line 1), got "${els[1].textContent}"`);
+  });
+
+  await checkAsync('translate mode leaks no {{ or }} marker text into rendered output', async () => {
+    internals.state.outputMode = 'translate';
+    internals.state.translationLang = 'en';
+    sandbox.window.LyricTranslate.translateLines = realTranslateLines;
+    sandbox.window.LyricTranslate.clearCache();
+
+    const prevSendMessage = chromeStub.runtime.sendMessage;
+    chromeStub.runtime.sendMessage = undefined;
+    sandbox.window.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [[
+        ['{{0}}As if sinking, as if melting away\n', 'src'],
+        ["{{1}}If I could become someone's heart", 'src']
+      ]]
+    });
+
+    try {
+      const converted = await internals.buildConvertedLines(rawLines);
+      await internals.applyTranslationMode(converted);
+      adapter.applyRomaji(page, converted);
+      internals.applyInteractionLayer(converted);
+
+      const els = doc.querySelectorAll('.spotify-romaji-line');
+      assert(els.length === 2, `expected 2 elements, got ${els.length}`);
+      for (const el of els) {
+        assert(!el.textContent.includes('{{') && !el.textContent.includes('}}'), `marker leaked in textContent: "${el.textContent}"`);
+        assert(!el.innerHTML.includes('{{') && !el.innerHTML.includes('}}'), `marker leaked in innerHTML: "${el.innerHTML}"`);
+      }
+      assert(els[0].textContent === 'As if sinking, as if melting away', `unexpected text: "${els[0].textContent}"`);
+      assert(els[1].textContent === "If I could become someone's heart", `unexpected text: "${els[1].textContent}"`);
+    } finally {
+      chromeStub.runtime.sendMessage = prevSendMessage;
+    }
+  });
+
+  // Restore romaji mode before tap-to-fix checks
+  internals.state.outputMode = 'romaji';
 
   // -------------------------------------------------------------------------
   console.log('\nInteraction - tap to fix');

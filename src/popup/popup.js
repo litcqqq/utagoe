@@ -14,9 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleAteji = document.getElementById('toggle-ateji');
 
   const selectOutputMode = document.getElementById('select-output-mode');
-  const toggleTranslation = document.getElementById('toggle-translation');
-  const selectTranslationLang = document.getElementById('select-translation-lang');
-  const translationLangContainer = document.getElementById('translation-lang-container');
   const toggleTapToFix = document.getElementById('toggle-tap-to-fix');
   const toggleBadges = document.getElementById('toggle-badges');
   const btnExportVocab = document.getElementById('btn-export-vocab');
@@ -137,6 +134,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  const VALID_OUTPUT_OPTIONS = new Set([
+    'romaji',
+    'furigana',
+    'hiragana',
+    'katakana',
+    'translate:en',
+    'translate:th',
+    'translate:zh',
+    'translate:id',
+    'translate:ko',
+    'translate:es',
+    'translate:vi',
+    'translate:fr',
+    'translate:de',
+    'translate:pt'
+  ]);
+
   // Load saved settings from chrome.storage.local
   chrome.storage.local.get(
     {
@@ -148,10 +162,9 @@ document.addEventListener('DOMContentLoaded', () => {
       enableAteji: true,
       customOverrides: {},
       outputMode: 'romaji',
+      translationLang: 'en',
       tapToFix: true,
       showBadges: true,
-      translationEnabled: false,
-      translationLang: 'en',
       lastTrackStatus: null
     },
     (items) => {
@@ -164,12 +177,14 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleValidator.checked = items.enableValidator !== false;
       toggleAteji.checked = items.enableAteji !== false;
 
-      selectOutputMode.value = items.outputMode || 'romaji';
-      toggleTranslation.checked = items.translationEnabled === true;
-      selectTranslationLang.value = items.translationLang || 'en';
+      const candidateMode = items.outputMode === 'translate'
+        ? `translate:${items.translationLang || 'en'}`
+        : (items.outputMode || 'romaji');
+      selectOutputMode.value = VALID_OUTPUT_OPTIONS.has(candidateMode) ? candidateMode : 'romaji';
+      if (!selectOutputMode.value) selectOutputMode.value = 'romaji';
+
       toggleTapToFix.checked = items.tapToFix !== false;
       toggleBadges.checked = items.showBadges !== false;
-      syncTranslationControls();
 
       currentOverrides = items.customOverrides || {};
       renderDictionary();
@@ -226,27 +241,14 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.set({ enableAteji: toggleAteji.checked });
   });
 
-  // The language picker is only meaningful when translation is on, so it is
-  // dimmed and disabled rather than hidden to avoid the popup reflowing.
-  function syncTranslationControls() {
-    const on = toggleTranslation.checked;
-    selectTranslationLang.disabled = !on;
-    if (translationLangContainer) {
-      translationLangContainer.classList.toggle('is-inactive', !on);
-    }
-  }
-
   selectOutputMode.addEventListener('change', () => {
-    chrome.storage.local.set({ outputMode: selectOutputMode.value });
-  });
-
-  toggleTranslation.addEventListener('change', () => {
-    chrome.storage.local.set({ translationEnabled: toggleTranslation.checked });
-    syncTranslationControls();
-  });
-
-  selectTranslationLang.addEventListener('change', () => {
-    chrome.storage.local.set({ translationLang: selectTranslationLang.value });
+    const val = selectOutputMode.value || 'romaji';
+    if (val.startsWith('translate:')) {
+      const lang = val.slice('translate:'.length) || 'en';
+      chrome.storage.local.set({ outputMode: 'translate', translationLang: lang });
+    } else {
+      chrome.storage.local.set({ outputMode: val });
+    }
   });
 
   toggleTapToFix.addEventListener('change', () => {

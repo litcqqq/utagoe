@@ -358,13 +358,25 @@ async function main() {
             sendMessage: function(m, cb){ if (cb) cb({ok:true}); },
             getURL: function(p){ return '${dictBase}/' + p; }
           };
+          // A writable settings object plus real change dispatch. The popup drives
+          // the content script through chrome.storage.onChanged, so a no-op stub
+          // would leave that whole path untested in the browser.
+          window.__utagoeSettings = {enabled:true,romajiSystem:'hepburn',fontSizeRatio:0.65,casing:'normal',
+            enableValidator:true,enableAteji:true,customOverrides:{},outputMode:'romaji',tapToFix:true,
+            showBadges:true,translationLang:'en'};
+          window.__utagoeChangeListeners = [];
           window.chrome.storage = { local: {
-            get: function(k, cb){ var s={enabled:true,romajiSystem:'hepburn',fontSizeRatio:0.65,casing:'normal',
-              enableValidator:true,enableAteji:true,customOverrides:{},outputMode:'romaji',tapToFix:true,
-              showBadges:true,translationEnabled:false,translationLang:'en'};
-              if (typeof cb==='function') return cb(s); return s; },
-            set: function(i, cb){ if (typeof cb==='function') cb(); }
-          }, onChanged: { addListener: function(){} } };
+            get: function(k, cb){ if (typeof cb==='function') return cb(Object.assign({}, window.__utagoeSettings)); return Object.assign({}, window.__utagoeSettings); },
+            set: function(items, cb){
+              var changes = {};
+              Object.keys(items).forEach(function(key){
+                changes[key] = { oldValue: window.__utagoeSettings[key], newValue: items[key] };
+                window.__utagoeSettings[key] = items[key];
+              });
+              window.__utagoeChangeListeners.forEach(function(fn){ try { fn(changes, 'local'); } catch (e) {} });
+              if (typeof cb==='function') cb();
+            }
+          }, onChanged: { addListener: function(fn){ window.__utagoeChangeListeners.push(fn); } } };
         })();`
       });
 
@@ -420,6 +432,112 @@ async function main() {
 
     record('lyric lines were found and processed', state.romajiLines > 0 || state.wordSpans > 0,
       `romajiLines=${state.romajiLines} wordSpans=${state.wordSpans}`);
+
+    // --- Translation display mode, in a real browser -----------------------
+    // The unit suite proves the logic; this proves the real DOM never gains a
+    // row. Spotify's highlight tracks lyric rows by index, so a second element
+    // inside a row is exactly the desync being guarded against here.
+    const before = await page.send('Runtime.evaluate', {
+      expression: `(() => {
+        const rows = Array.from(document.querySelectorAll('[data-testid="fullscreen-lyric-line"]'));
+        return JSON.stringify({
+          rowCount: rows.length,
+          childCounts: rows.map(r => r.childElementCount),
+          elCounts: rows.map(r => r.querySelectorAll('*').length),
+          translationLines: document.querySelectorAll('.utagoe-translation-line').length
+        });
+      })()`,
+      returnByValue: true
+    });
+    const beforeState = JSON.parse(before.result.value);
+
+    // Google Translate is unreachable from this probe, so the network call is
+    // replaced with a deterministic stub; everything after it is the real path.
+    const switched = await page.send('Runtime.evaluate', {
+      expression: `(() => {
+        window.LyricTranslate.translateLines = async (sources) =>
+          sources.map(s => s ? 'TRANSLATED::' + s.slice(0, 8) : '');
+        window.chrome.storage.local.set({ outputMode: 'translate', translationLang: 'en' });
+        return 'ok';
+      })()`,
+      returnByValue: true
+    });
+    await sleep(2500);
+
+    const after = await page.send('Runtime.evaluate', {
+      expression: `(() => {
+        const rows = Array.from(document.querySelectorAll('[data-testid="fullscreen-lyric-line"]'));
+        const els = document.querySelectorAll('.spotify-romaji-line');
+        return JSON.stringify({
+          rowCount: rows.length,
+          childCounts: rows.map(r => r.childElementCount),
+          elCounts: rows.map(r => r.querySelectorAll('*').length),
+          translationLines: document.querySelectorAll('.utagoe-translation-line').length,
+          romajiLineCount: els.length,
+          texts: Array.from(els).map(e => e.textContent.trim()),
+          badges: document.querySelectorAll('.utagoe-badge').length,
+          wordSpans: document.querySelectorAll('.utagoe-word').length
+        });
+      })()`,
+      returnByValue: true
+    });
+    const afterState = JSON.parse(after.result.value);
+
+    record('switching to translate mode re-renders every line', switched.result && switched.result.value === 'ok' &&
+      afterState.romajiLineCount === beforeState.rowCount,
+      `lineCount=${afterState.romajiLineCount} expected=${beforeState.rowCount}`);
+    record('translate mode renders translated text in place', afterState.texts.length > 0 &&
+      afterState.texts.every(t => t.startsWith('TRANSLATED::')),
+      JSON.stringify(afterState.texts).slice(0, 200));
+    // The row must never GROW: the confidence badge is removed in translate mode
+    // (it is absolutely positioned, so its absence changes no geometry), and no
+    // row may ever gain a child. Growth is what shifts Spotify's highlight.
+    const childGrew = afterState.childCounts.some((c, i) => c > beforeState.childCounts[i]);
+    record('translate mode adds no lyric row and never grows a row', 
+      afterState.rowCount === beforeState.rowCount &&
+      !childGrew &&
+      afterState.translationLines === 0,
+      `rows ${beforeState.rowCount}->${afterState.rowCount} children ${JSON.stringify(beforeState.childCounts)}->${JSON.stringify(afterState.childCounts)} translationLines=${afterState.translationLines}`);
+    record('translate mode keeps exactly one text element per lyric row',
+      afterState.childCounts.every(c => c === 1),
+      `childCounts=${JSON.stringify(afterState.childCounts)}`);
+    record('translate mode emits no word spans or badges', afterState.wordSpans === 0 && afterState.badges === 0,
+      `wordSpans=${afterState.wordSpans} badges=${afterState.badges}`);
+
+    // Switching back must fully restore romaji markup, with no leftovers from
+    // the translation pass and still no extra rows.
+    await page.send('Runtime.evaluate', {
+      expression: `(() => { window.chrome.storage.local.set({ outputMode: 'romaji' }); return 'ok'; })()`,
+      returnByValue: true
+    });
+    await sleep(2500);
+
+    const back = await page.send('Runtime.evaluate', {
+      expression: `(() => {
+        const rows = Array.from(document.querySelectorAll('[data-testid="fullscreen-lyric-line"]'));
+        const els = document.querySelectorAll('.spotify-romaji-line');
+        return JSON.stringify({
+          rowCount: rows.length,
+          childCounts: rows.map(r => r.childElementCount),
+          translationLines: document.querySelectorAll('.utagoe-translation-line').length,
+          romajiLineCount: els.length,
+          texts: Array.from(els).map(e => e.textContent.trim()),
+          wordSpans: document.querySelectorAll('.utagoe-word').length
+        });
+      })()`,
+      returnByValue: true
+    });
+    const backState = JSON.parse(back.result.value);
+
+    record('switching back to romaji restores markup and leaves no leftovers',
+      backState.romajiLineCount === beforeState.rowCount &&
+      backState.translationLines === 0 &&
+      backState.wordSpans > 0 &&
+      backState.texts.every(t => !t.startsWith('TRANSLATED::')) &&
+      JSON.stringify(backState.childCounts) === JSON.stringify(beforeState.childCounts),
+      `romajiLines=${backState.romajiLineCount} wordSpans=${backState.wordSpans} translationLines=${backState.translationLines} children=${JSON.stringify(backState.childCounts)}`);
+
+    console.log('\n  translate-mode probe:', JSON.stringify({ before: beforeState, after: afterState, back: backState }));
 
     console.log('\n  probe state:', JSON.stringify(state));
     console.log('  page errors:', JSON.stringify(pageEvents_(page)).slice(0, 1500));

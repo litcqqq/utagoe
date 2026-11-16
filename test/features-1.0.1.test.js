@@ -281,11 +281,25 @@ async function main() {
     );
   });
 
-  check('version is 1.0.1 in package.json and manifest.json', () => {
+  check('popup exposes a single display-mode dropdown with translation optgroup and no separate toggle', () => {
+    const popupHtml = readDist('popup/popup.html');
+    const popupJs = readDist('popup/popup.js');
+    assert(popupHtml.includes('id="select-output-mode"'), 'select-output-mode missing');
+    assert(popupHtml.includes('<optgroup label="Translation">'), 'Translation optgroup missing');
+    for (const code of ['en', 'th', 'zh', 'id', 'ko', 'es', 'vi', 'fr', 'de', 'pt']) {
+      assert(popupHtml.includes(`value="translate:${code}"`), `missing option translate:${code}`);
+    }
+    assert(!popupHtml.includes('toggle-translation'), 'legacy toggle-translation still present in popup.html');
+    assert(!popupHtml.includes('select-translation-lang'), 'legacy select-translation-lang still present in popup.html');
+    assert(!popupJs.includes('toggleTranslation'), 'legacy toggleTranslation still present in popup.js');
+    assert(!popupJs.includes('translationEnabled'), 'legacy translationEnabled still present in popup.js');
+  });
+
+  check('version is 1.0.2 in package.json and manifest.json', () => {
     const pkgVersion = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
     const manVersion = JSON.parse(readDist('manifest.json')).version;
-    assert(pkgVersion === '1.0.1', `package.json is ${pkgVersion}`);
-    assert(manVersion === '1.0.1', `manifest.json is ${manVersion}`);
+    assert(pkgVersion === '1.0.2', `package.json is ${pkgVersion}`);
+    assert(manVersion === '1.0.2', `manifest.json is ${manVersion}`);
   });
 
   console.log('\n====================================================');
