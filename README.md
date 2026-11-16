@@ -78,9 +78,19 @@ Folder hasil build siap pasang berada di direktori [`dist/`](dist).
 ## Cara Penggunaan di YouTube Music
 
 1. Buka [YouTube Music](https://music.youtube.com) dan putar lagu berbahasa Jepang.
-2. Buka halaman pemutar lagu, lalu klik tab **Lyrics** di panel samping (dukungan YouTube Music mengharuskan tab **Lyrics** dibuka terlebih dahulu agar kontainer lirik dirender oleh halaman).
+2. Buka halaman pemutar lagu, lalu klik tab **Lyrics** di panel samping. Dukungan YouTube Music mengharuskan tab **Lyrics** dibuka terlebih dahulu, karena kontainer lirik baru dirender oleh halaman setelah tab tersebut diaktifkan.
 3. Setiap baris lirik Jepang akan otomatis ditampilkan bertingkat dengan Romaji di bagian atas dan teks asli Jepang di bagian bawah.
-4. Saat berpindah lagu (*SPA navigation*), klik kembali tab **Lyrics** untuk menampilkan lirik beserta transliterasi Romaji pada lagu baru.
+4. Saat berpindah lagu, ekstensi memindai ulang secara otomatis (hook `yt-navigate-finish`, klik tab Lyrics, `MutationObserver`, dan polling 1,5 detik). Jika tab **Lyrics** sempat tertutup atau lirik belum muncul, buka kembali tab tersebut.
+
+---
+
+## Batasan yang Diketahui (Limitations)
+
+- Hanya untuk **versi web desktop** (`music.youtube.com`), bukan aplikasi desktop atau mobile YouTube Music.
+- Lirik harus tersedia dari YouTube Music untuk lagu tersebut; jika lagu tidak punya lirik, tidak ada yang bisa di-*romanisasi*.
+- **Click-to-seek** (klik baris lirik untuk melompat ke detik tertentu) saat ini hanya berfungsi di Spotify, belum di YouTube Music.
+- Tampilan lirik **full-screen** YouTube Music memakai komponen berbeda dan belum diberi gaya bertingkat; yang didukung adalah panel lirik di samping pemutar.
+- Metadata lagu (judul/artis) dibaca dari `ytmusic-track-info`; layout lama yang memakai `ytmusic-player-bar` tetap didukung sebagai cadangan.
 
 ---
 
