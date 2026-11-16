@@ -1,0 +1,112 @@
+name: Release
+
+# Builds the unpacked extension from source and attaches a ready-to-load
+# zip to a GitHub Release. Users never need Node.js installed.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v1.0.0). Must match the manifest version.'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension into dist/
+        run: npm run build
+
+      - name: Run verification suite
+        run: npm test
+
+      - name: Resolve version and check it matches the manifest
+        id: version
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag || github.ref_name }}"
+          MANIFEST_VERSION="$(node -p "require('./dist/manifest.json').version")"
+          if [ "$TAG" != "v$MANIFEST_VERSION" ]; then
+            echo "::error::Tag '$TAG' does not match manifest version 'v$MANIFEST_VERSION'."
+            echo "Bump src/manifest.json version (and package.json) before tagging."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "zip=utagoe-$TAG.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Package dist/ into a loadable zip
+        run: |
+          set -euo pipefail
+          cd dist
+          # Zip the CONTENTS of dist so manifest.json sits at the archive root.
+          zip -r -9 "../${{ steps.version.outputs.zip }}" . -x '*.DS_Store'
+
+      - name: Verify the archive is complete
+        run: |
+          set -euo pipefail
+          ZIP="${{ steps.version.outputs.zip }}"
+          LISTING="$(unzip -Z1 "$ZIP")"
+
+          # manifest.json must be at the archive root, not inside a subfolder,
+          # otherwise "Load unpacked" cannot find it.
+          echo "$LISTING" | grep -qx 'manifest.json' \
+            || { echo "::error::manifest.json is not at the archive root"; exit 1; }
+
+          # The Kuromoji dictionary is 17 MB of the archive and is gitignored,
+          # so a broken build step silently produces an extension that fails at
+          # runtime with a dictionary fetch error. Fail loudly instead.
+          DICT_COUNT="$(echo "$LISTING" | grep -c '^dict/.*\.dat\.gz$' || true)"
+          if [ "$DICT_COUNT" -lt 10 ]; then
+            echo "::error::Expected at least 10 dict/*.dat.gz entries, found $DICT_COUNT."
+            exit 1
+          fi
+
+          echo "$LISTING" | grep -qx 'lib/kuroshiro.min.js' \
+            || { echo "::error::lib/kuroshiro.min.js missing"; exit 1; }
+          echo "$LISTING" | grep -qx 'lib/kuroshiro-analyzer-kuromoji.min.js' \
+            || { echo "::error::kuromoji analyzer missing"; exit 1; }
+
+          echo "Archive OK: $(echo "$LISTING" | wc -l) files, $DICT_COUNT dictionary files."
+          du -h "$ZIP"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Utagoe ${{ steps.version.outputs.tag }}
+          files: ${{ steps.version.outputs.zip }}
+          generate_release_notes: true
+          body: |
+            ## Install (no Node.js required)
+
+            1. Download **`${{ steps.version.outputs.zip }}`** below.
+            2. Unzip it anywhere — you should see `manifest.json` directly inside the folder.
+            3. Open `chrome://extensions/` (or `edge://extensions/`).
+            4. Turn on **Developer mode**.
+            5. Click **Load unpacked** and select the unzipped folder.
+            6. Open [Spotify Web](https://open.spotify.com) or [YouTube Music](https://music.youtube.com), play a Japanese song, and open the lyrics panel.
+
+            On YouTube Music you must open the **Lyrics** tab once — the extension can only
+            style the lyric container after the page renders it.
+
+            ### Updating
+            Download the new zip, unzip over the old folder, then press **Reload** on the
+            extension card in `chrome://extensions/`.
