@@ -205,7 +205,8 @@
         ? lineEl.querySelector('.spotify-romaji-line')
         : null;
 
-      if (getAttr(lineEl, 'data-has-romaji') === 'true' && romajiEl && romajiEl.textContent === romaji) {
+      if (getAttr(lineEl, 'data-has-romaji') === 'true' && romajiEl &&
+          getAttr(romajiEl, 'data-utagoe-source') === romaji) {
         continue;
       }
 
@@ -216,10 +217,17 @@
         romajiEl.className = 'spotify-romaji-line';
         setAttr(romajiEl, 'dir', 'auto');
         setAttr(romajiEl, 'aria-hidden', 'true');
+        // Stamped so the interaction layer can pair an element with its line
+        // without relying on document order, which skips empty rows.
+        setAttr(romajiEl, 'data-line-index', String(i));
         prependEl(lineEl, romajiEl);
       }
 
-      if (romajiEl.textContent !== romaji) {
+      // The rendered content is owned by the interaction layer (ruby markup,
+      // per-word spans). The adapter records what it *intended* so this check
+      // stays stable no matter what markup the element currently holds.
+      setAttr(romajiEl, 'data-utagoe-source', romaji);
+      if (romajiEl.textContent !== romaji && !getAttr(romajiEl, 'data-utagoe-managed')) {
         romajiEl.textContent = romaji;
       }
     }

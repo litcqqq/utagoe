@@ -9,8 +9,10 @@
  */
 
 const LRCLIB_ENDPOINT = 'https://lrclib.net/api';
+const GOOGLE_TRANSLATE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single';
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 100;
+const TRANSLATE_TIMEOUT_MS = 12000;
 
 /** @type {Map<string, {expires: number, payload: any}>} */
 const responseCache = new Map();
@@ -75,8 +77,99 @@ async function searchLrclib(query) {
   }
 }
 
+/**
+ * Translation proxy.
+ *
+ * Same CORS reasoning as Lrclib: translate.googleapis.com cannot be called from
+ * a content script on open.spotify.com, so the request is made here. The GTX
+ * endpoint returns `[[["text","source",...],...],...]` and splits a
+ * newline-joined batch into one segment per line, which is how multiple lyric
+ * lines are translated in a single round trip.
+ */
+async function translateTexts(texts, targetLang, sourceLang) {
+  if (!Array.isArray(texts) || texts.length === 0) {
+    return { ok: false, error: 'Empty translation request' };
+  }
+  if (!targetLang) {
+    return { ok: false, error: 'Missing target language' };
+  }
+
+  const sanitized = texts.map(line => String(line == null ? '' : line).replace(/\r?\n/g, ' ').trim());
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TRANSLATE_TIMEOUT_MS);
+
+  async function requestOne(query, signal) {
+    const url = `${GOOGLE_TRANSLATE_ENDPOINT}?client=gtx` +
+      `&sl=${encodeURIComponent(sourceLang || 'ja')}` +
+      `&tl=${encodeURIComponent(targetLang)}` +
+      `&dt=t&q=${encodeURIComponent(query)}`;
+
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    if (!Array.isArray(data) || !Array.isArray(data[0])) {
+      throw new Error('Unexpected response format from translation endpoint');
+    }
+
+    let out = '';
+    for (const segment of data[0]) {
+      if (Array.isArray(segment) && typeof segment[0] === 'string') out += segment[0];
+    }
+    return out;
+  }
+
+  try {
+    if (sanitized.length === 1) {
+      const single = await requestOne(sanitized[0], controller.signal);
+      return { ok: true, translations: [single.trim()] };
+    }
+
+    const joined = sanitized.join('\n');
+    const batch = await requestOne(joined, controller.signal);
+    const split = batch.split(/\r?\n/);
+
+    if (split.length === sanitized.length) {
+      return { ok: true, translations: split.map(line => line.trim()) };
+    }
+
+    // Google sometimes merges or drops newline boundaries. Translating line by
+    // line is slower but preserves the caller's index alignment, which matters
+    // because each result is attached to a specific lyric line.
+    const perLine = [];
+    for (const line of sanitized) {
+      const translated = await requestOne(line, controller.signal);
+      perLine.push(translated.trim());
+    }
+    return { ok: true, translations: perLine };
+  } catch (err) {
+    const aborted = err && err.name === 'AbortError';
+    return {
+      ok: false,
+      error: aborted
+        ? 'Timed out while contacting translation service'
+        : String((err && err.message) || err)
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.type !== 'LRCLIB_SEARCH') return false;
+  if (!message) return false;
+
+  if (message.type === 'UTAGOE_TRANSLATE') {
+    translateTexts(message.texts, message.targetLang, message.sourceLang)
+      .then(sendResponse)
+      .catch(err => sendResponse({ ok: false, error: String((err && err.message) || err) }));
+    return true;
+  }
+
+  if (message.type !== 'LRCLIB_SEARCH') return false;
 
   searchLrclib(message.query)
     .then(sendResponse)

@@ -1,12 +1,16 @@
 {
   "name": "utagoe",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Japanese lyrics Romaji browser extension for Spotify Web Player and YouTube Music",
   "main": "index.js",
   "scripts": {
     "build": "node build.js",
     "pretest": "node build.js",
-    "test": "node test/verify-extension.js"
+    "test": "node build.js && node test/verify-extension.js && node test/features-1.0.1.test.js && node test/render-path.test.js",
+    "test:features": "node test/features-1.0.1.test.js",
+    "test:render": "node test/render-path.test.js",
+    "test:browser": "node build.js && node test/browser-probe.js",
+    "test:all": "node build.js && node test/verify-extension.js && node test/features-1.0.1.test.js && node test/render-path.test.js && node test/browser-probe.js"
   },
   "keywords": [
     "browser-extension",

@@ -362,10 +362,12 @@
       renderTarget.childNodes.length = 0;
     }
 
-    for (const { originalText, romaji } of pairs) {
+    for (let pairIndex = 0; pairIndex < pairs.length; pairIndex++) {
+      const { originalText, romaji } = pairs[pairIndex];
       const row = createEl(doc, 'div');
       setAttr(row, 'data-lyric-line', 'true');
       setAttr(row, 'data-original-text', originalText);
+      setAttr(row, 'data-line-index', String(pairIndex));
 
       if (originalText.trim() === '') {
         row.className = 'ytm-lyric-line ytm-lyric-empty';
@@ -381,6 +383,10 @@
         romajiEl.className = 'spotify-romaji-line';
         setAttr(romajiEl, 'dir', 'auto');
         setAttr(romajiEl, 'aria-hidden', 'true');
+        // Stamped so the interaction layer can pair an element with its line
+        // without relying on document order, which skips empty rows.
+        setAttr(romajiEl, 'data-line-index', String(pairIndex));
+        setAttr(romajiEl, 'data-utagoe-source', romaji);
         romajiEl.textContent = romaji;
         appendEl(row, romajiEl);
       }
@@ -435,6 +441,7 @@
         const originalText = extractRowOriginalText(row);
         setAttr(row, 'data-lyric-line', 'true');
         setAttr(row, 'data-original-text', originalText);
+        setAttr(row, 'data-line-index', String(i));
 
         if (originalText.trim() === '') {
           setAttr(row, 'data-has-romaji', 'true');
@@ -464,9 +471,13 @@
             romajiEl.className = 'spotify-romaji-line';
             setAttr(romajiEl, 'dir', 'auto');
             setAttr(romajiEl, 'aria-hidden', 'true');
+            setAttr(romajiEl, 'data-line-index', String(i));
             prependEl(row, romajiEl);
           }
-          romajiEl.textContent = romaji;
+          setAttr(romajiEl, 'data-utagoe-source', romaji);
+          if (romajiEl.textContent !== romaji && !getAttr(romajiEl, 'data-utagoe-managed')) {
+            romajiEl.textContent = romaji;
+          }
         }
 
         setAttr(row, 'data-has-romaji', 'true');

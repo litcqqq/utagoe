@@ -19,16 +19,24 @@
     enableAteji: true,
     customOverrides: {},
 
+    outputMode: 'romaji',        // 'romaji' | 'hiragana' | 'katakana' | 'furigana'
+    tapToFix: true,              // tap a word to correct its reading
+    showBadges: true,            // per-line confidence dot
+    translationEnabled: false,   // stacked translation line
+    translationLang: 'en',
+
     currentTrackTitle: '',
     currentArtist: '',
     verifiedLyrics: null,
     currentSource: 'kuroshiro',
+    lastLines: [],               // last rendered lines, for vocabulary export
 
     kuroshiroReady: false,
     kuroshiroLoading: false,
     conversionQueue: new Map(),
     cache: new Map()
   };
+
 
   let kuroshiro = null;
   let analyzer = null;
@@ -177,6 +185,9 @@
         await kuroshiro.init(analyzer);
         state.kuroshiroReady = true;
         kuroshiroFailedAt = 0;
+        // The reading engine shares the same dictionary instance so tokenising,
+        // furigana, tap-to-fix and export all read from one analysis.
+        if (window.LyricReadings) window.LyricReadings.init(kuroshiro);
         return true;
       } catch (err) {
         kuroshiroFailedAt = Date.now();
@@ -279,6 +290,396 @@
     }
   }
 
+  // Decide how a line's words are laid out for the active output mode. Returns
+  // both the plain text (what the adapters compare for idempotency) and the
+  // rich markup, so a re-render can never disagree with the cached text.
+  function buildLineView(tokens, casing) {
+    const mode = state.outputMode;
+    const withCasing = (value) => (casing === 'lowercase' ? value.toLowerCase() : value);
+
+    if (mode === 'furigana') {
+      const plain = tokens.map((t) => t.kana).join('');
+      const html = tokens.map((token) => {
+        const surface = escapeHtml(token.surface);
+        if (!token.hasKanji || !token.kana || token.kana === token.surface) {
+          return `<span class="utagoe-word" data-surface="${escapeHtml(token.surface)}">${surface}</span>`;
+        }
+        return `<span class="utagoe-word" data-surface="${escapeHtml(token.surface)}">` +
+          `<ruby>${surface}<rt>${escapeHtml(token.kana)}</rt></ruby></span>`;
+      }).join('');
+      return { text: plain, html };
+    }
+
+    if (mode === 'hiragana' || mode === 'katakana') {
+      const convert = mode === 'katakana' ? window.LyricReadings.toKatakana : (v) => v;
+      const parts = tokens.map((t) => {
+        const kana = convert(t.kana);
+        const label = escapeHtml(kana);
+        return `<span class="utagoe-word" data-surface="${escapeHtml(t.surface)}">${label}</span>`;
+      });
+      const plain = tokens.map((t) => convert(t.kana)).join('');
+      return { text: withCasing(plain), html: parts.join('') };
+    }
+
+    // Romaji: Japanese punctuation sticks to the word before it rather than
+    // floating on its own with spaces around it.
+    const pieces = [];
+    let plain = '';
+    for (const token of tokens) {
+      if (!window.LyricReadings.hasJapanese(token.surface)) {
+        pieces.push(escapeHtml(token.romaji));
+        plain += token.romaji;
+        continue;
+      }
+      const needsSpace = plain && !plain.endsWith(' ');
+      if (needsSpace) plain += ' ';
+      plain += token.romaji;
+      const label = escapeHtml(token.romaji);
+      pieces.push((needsSpace ? ' ' : '') +
+        `<span class="utagoe-word" data-surface="${escapeHtml(token.surface)}">${label}</span>`);
+    }
+
+    const trimmed = plain.trim().replace(/\s+([,.!?;:])/g, '$1');
+    return { text: withCasing(trimmed), html: pieces.join('') };
+  }
+
+  function escapeHtml(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // Turn every visible lyric line into tokens, then into display lines.
+  async function buildConvertedLines(rawLines) {
+    const results = new Array(rawLines.length);
+    let lyricIndex = 0;
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const text = rawLines[i] || '';
+      const trimmed = text.trim();
+
+      if (!trimmed || !hasJapanese(trimmed)) {
+        results[i] = { text, romaji: '', output: '', html: '', badge: '', translation: '' };
+        continue;
+      }
+
+      const idx = lyricIndex++;
+      const verified = Boolean(state.verifiedLyrics);
+      const tokens = window.LyricReadings
+        ? await window.LyricReadings.tokenize(trimmed, {
+            romajiSystem: state.romajiSystem,
+            customOverrides: state.customOverrides,
+            enableAteji: state.enableAteji,
+            verified
+          })
+        : [];
+
+      if (!tokens || tokens.length === 0) {
+        results[i] = { text, romaji: '', output: '', html: '', badge: '', translation: '' };
+        continue;
+      }
+
+      const view = buildLineView(tokens, state.casing);
+      // `romaji` stays the plain romaji string because the adapters and the
+      // idempotency check still compare against it.
+      const romajiText = state.outputMode === 'romaji'
+        ? view.text
+        : (await convertToRomaji(trimmed, idx)) || '';
+
+      results[i] = {
+        text,
+        romaji: romajiText,
+        output: view.text,
+        html: view.html,
+        mode: state.outputMode,
+        confBadge: state.showBadges ? window.LyricReadings.lineConfidence(tokens) : '',
+        translation: '',
+        tokens
+      };
+    }
+
+    return results;
+  }
+
+  // Fill in translations for the lines that need them. Failure is silent: a
+  // missing translation must never take the romaji line down with it.
+  async function attachTranslations(lines) {
+    if (!state.translationEnabled || !window.LyricTranslate) return lines;
+
+    const sources = lines.map((line) => (line.tokens && line.tokens.length ? line.text : ''));
+    if (!sources.some(Boolean)) return lines;
+
+    try {
+      const translated = await window.LyricTranslate.translateLines(sources, {
+        targetLang: state.translationLang
+      });
+      for (let i = 0; i < lines.length; i++) {
+        const value = translated[i];
+        if (typeof value === 'string' && value.trim()) lines[i].translation = value.trim();
+      }
+    } catch (err) {
+      console.warn('[Utagoe] Translation unavailable:', err && err.message);
+    }
+
+    return lines;
+  }
+
+  /**
+   * The site adapters own the plain stacked romaji line. Everything that needs
+   * structure the adapters do not model — rich markup per word, the confidence
+   * dot, the translation line, and tap targets — is attached here afterwards,
+   * by locating the romaji elements the adapter just wrote and upgrading them
+   * in place. Keeping this separate means a site redesign only breaks one
+   * unwrapping rule instead of the whole render path.
+   */
+  function applyInteractionLayer(lines) {
+    const needsRich = state.outputMode !== 'romaji' || state.translationEnabled ||
+      state.showBadges || state.tapToFix;
+    if (!needsRich) return;
+
+    const doc = document;
+    const romajiEls = Array.from(doc.querySelectorAll('.spotify-romaji-line'));
+
+    for (const el of romajiEls) {
+      // Pair by stamped index, not by position: empty lyric rows create no
+      // romaji element, so a positional walk would drift out of sync.
+      const raw = el.getAttribute('data-line-index');
+      const index = raw === null ? NaN : Number(raw);
+      const line = Number.isInteger(index) ? lines[index] : null;
+      if (!line || !line.tokens || line.tokens.length === 0) continue;
+
+      upgradeRomajiElement(el, line, doc);
+      applyTranslationLine(el, line, doc);
+      applyConfidenceBadge(el, line, doc);
+    }
+
+    if (state.tapToFix) bindTapHandler(doc);
+  }
+
+  // Replace the adapter's plain text with per-word markup so words can be
+  // addressed individually, and switch to ruby markup in furigana mode.
+  function upgradeRomajiElement(el, line, doc) {
+    const wantHtml = line.html || '';
+
+    // Marked managed so the site adapter stops overwriting textContent with the
+    // plain romaji once richer markup is in place.
+    if (wantHtml) el.setAttribute('data-utagoe-managed', 'true');
+
+    // Compare the markup itself, never a signature: the site adapter rewrites
+    // textContent on each pass, so a signature-only guard would leave the plain
+    // romaji in place and the richer markup would never be restored.
+    if (wantHtml && el.innerHTML !== wantHtml) {
+      el.innerHTML = wantHtml;
+    }
+
+    if (line.mode === 'furigana') {
+      el.classList.add('utagoe-furigana');
+    } else {
+      el.classList.remove('utagoe-furigana');
+    }
+  }
+
+  // The translation line sits below the original text, which visually groups it
+  // with the lyric it explains rather than with the romaji above it.
+  function applyTranslationLine(romajiEl, line, doc) {
+    const parent = romajiEl.parentElement;
+    if (!parent) return;
+
+    let el = parent.querySelector(':scope > .utagoe-translation-line');
+    const text = line.translation || '';
+
+    if (!text) {
+      if (el) el.remove();
+      return;
+    }
+
+    if (!el) {
+      el = doc.createElement('div');
+      el.className = 'utagoe-translation-line';
+      el.setAttribute('dir', 'auto');
+      el.setAttribute('aria-hidden', 'true');
+      parent.appendChild(el);
+    }
+    if (el.textContent !== text) el.textContent = text;
+  }
+
+  const BADGE_LABELS = {
+    verified: 'Verified lyrics from Lrclib',
+    user: 'Reading from your own corrections',
+    dictionary: 'Reading from the ateji dictionary',
+    auto: 'Machine reading, may be inaccurate'
+  };
+
+  function applyConfidenceBadge(romajiEl, line, doc) {
+    const parent = romajiEl.parentElement;
+    if (!parent) return;
+
+    const existing = parent.querySelector(':scope > .utagoe-badge');
+    const source = line.confBadge;
+
+    if (!state.showBadges || !source) {
+      if (existing) existing.remove();
+      return;
+    }
+
+    const badge = existing || doc.createElement('span');
+    if (!existing) {
+      badge.className = 'utagoe-badge';
+      parent.appendChild(badge);
+    }
+    badge.setAttribute('data-source', source);
+    badge.title = BADGE_LABELS[source] || BADGE_LABELS.auto;
+    badge.textContent = '';
+  }
+
+  let tapHandlerBound = false;
+
+  function bindTapHandler(doc) {
+    if (tapHandlerBound) return;
+    tapHandlerBound = true;
+
+    doc.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!target || typeof target.closest !== 'function') return;
+      const word = target.closest('.utagoe-word');
+      if (!word) return;
+
+      const surface = word.getAttribute('data-surface');
+      if (!surface || !hasJapanese(surface)) return;
+
+      // The lyrics list seeks on click; a correction tap must not jump the track.
+      event.preventDefault();
+      event.stopPropagation();
+
+      openReadingEditor(word, surface, doc);
+    }, true);
+  }
+
+  /**
+   * Inline editor instead of window.prompt: prompt() is blocked in some
+   * embedded contexts and cannot be styled or dismissed by tapping away.
+   */
+  function openReadingEditor(wordEl, surface, doc) {
+    closeReadingEditor(doc);
+
+    const current = state.customOverrides[surface] || '';
+    const rect = wordEl.getBoundingClientRect ? wordEl.getBoundingClientRect() : null;
+
+    const pop = doc.createElement('div');
+    pop.className = 'utagoe-editor';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Fix reading for ' + surface);
+    if (rect) {
+      pop.style.setProperty('--utagoe-editor-top', `${Math.round(rect.bottom + 6)}px`);
+      pop.style.setProperty('--utagoe-editor-left', `${Math.round(rect.left)}px`);
+    }
+
+    const title = doc.createElement('div');
+    title.className = 'utagoe-editor-title';
+    title.textContent = surface;
+    pop.appendChild(title);
+
+    const input = doc.createElement('input');
+    input.className = 'utagoe-editor-input';
+    input.type = 'text';
+    input.value = current;
+    input.placeholder = 'reading, e.g. sadame';
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('spellcheck', 'false');
+    pop.appendChild(input);
+
+    const actions = doc.createElement('div');
+    actions.className = 'utagoe-editor-actions';
+
+    const save = doc.createElement('button');
+    save.className = 'utagoe-editor-save';
+    save.type = 'button';
+    save.textContent = 'Save';
+
+    const cancel = doc.createElement('button');
+    cancel.className = 'utagoe-editor-cancel';
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+
+    actions.appendChild(save);
+    actions.appendChild(cancel);
+    pop.appendChild(actions);
+    doc.body.appendChild(pop);
+
+    const commit = () => {
+      const value = input.value.trim();
+      const next = Object.assign({}, state.customOverrides);
+      if (value) {
+        next[surface] = value;
+      } else {
+        delete next[surface];
+      }
+      state.customOverrides = next;
+      safeStorageSet({ customOverrides: next });
+      closeReadingEditor(doc);
+      // Storage listeners do not fire in the same document, so re-render here.
+      state.cache.clear();
+      scheduleScan();
+    };
+
+    save.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      commit();
+    });
+
+    cancel.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeReadingEditor(doc);
+    });
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commit();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeReadingEditor(doc);
+      }
+    });
+
+    setTimeout(() => {
+      if (typeof input.focus === 'function') input.focus();
+      if (typeof input.select === 'function') input.select();
+    }, 0);
+  }
+
+  function closeReadingEditor(doc) {
+    const existing = (doc || document).querySelectorAll('.utagoe-editor');
+    existing.forEach((el) => el.remove());
+  }
+
+  /**
+   * Export the currently displayed song's kanji vocabulary as a CSV. Exposed on
+   * the page as LyricRomaji.exportVocabulary() so the popup can trigger it with
+   * a single message, keeping the DOM knowledge in the content script.
+   */
+  function exportVocabulary() {
+    if (!window.LyricExport || !window.LyricReadings) return false;
+
+    const words = window.LyricReadings.collectVocabulary(state.lastLines);
+    if (words.length === 0) return false;
+
+    const csv = window.LyricExport.buildCsv(words, {
+      songTitle: state.currentTrackTitle,
+      artist: state.currentArtist
+    });
+    const filename = window.LyricExport.suggestFilename(
+      state.currentTrackTitle,
+      state.currentArtist
+    );
+    window.LyricExport.downloadCsv(csv, filename);
+    return true;
+  }
+
   // Scan and process every visible lyric line through the active site adapter
   async function scanAndProcessLyrics() {
     if (!ensureContext()) return;
@@ -316,28 +717,13 @@
       if (!ready) return;
     }
 
-    let lyricIndex = 0;
-    const convertedLines = await Promise.all(
-      rawLines.map(async (text) => {
-        const trimmed = (text || '').trim();
-        if (!trimmed) {
-          return { text: text || '', romaji: '' };
-        }
-        const idx = lyricIndex++;
-        if (!hasJapanese(trimmed)) {
-          return { text, romaji: '' };
-        }
-        const romaji = await convertToRomaji(trimmed, idx);
-        if (!romaji) {
-          return { text, romaji: '' };
-        }
-        const displayRomaji = state.casing === 'lowercase' ? romaji.toLowerCase() : romaji;
-        return { text, romaji: displayRomaji };
-      })
-    );
+    const convertedLines = await buildConvertedLines(rawLines);
+    await attachTranslations(convertedLines);
 
     if (!state.enabled) return;
+    state.lastLines = convertedLines.filter((line) => line.tokens && line.tokens.length);
     adapter.applyRomaji(container, convertedLines);
+    applyInteractionLayer(convertedLines);
   }
 
   let scanTimeout = null;
@@ -453,7 +839,12 @@
       'casing',
       'enableValidator',
       'enableAteji',
-      'customOverrides'
+      'customOverrides',
+      'outputMode',
+      'tapToFix',
+      'showBadges',
+      'translationEnabled',
+      'translationLang'
     ], (res) => {
       if (res.enabled !== undefined) state.enabled = res.enabled;
       if (res.romajiSystem) state.romajiSystem = res.romajiSystem;
@@ -462,6 +853,11 @@
       if (res.enableValidator !== undefined) state.enableValidator = res.enableValidator;
       if (res.enableAteji !== undefined) state.enableAteji = res.enableAteji;
       if (res.customOverrides) state.customOverrides = res.customOverrides;
+      if (res.outputMode) state.outputMode = res.outputMode;
+      if (res.tapToFix !== undefined) state.tapToFix = res.tapToFix;
+      if (res.showBadges !== undefined) state.showBadges = res.showBadges;
+      if (res.translationEnabled !== undefined) state.translationEnabled = res.translationEnabled;
+      if (res.translationLang) state.translationLang = res.translationLang;
 
       updateCSSVariables();
       scheduleScan();
@@ -513,6 +909,32 @@
         needsReconversion = true;
       }
 
+      if (changes.outputMode) {
+        state.outputMode = changes.outputMode.newValue || 'romaji';
+        needsReconversion = true;
+      }
+
+      if (changes.tapToFix) {
+        state.tapToFix = changes.tapToFix.newValue !== false;
+        needsReconversion = true;
+      }
+
+      if (changes.showBadges) {
+        state.showBadges = changes.showBadges.newValue !== false;
+        needsReconversion = true;
+      }
+
+      if (changes.translationEnabled) {
+        state.translationEnabled = changes.translationEnabled.newValue === true;
+        needsReconversion = true;
+      }
+
+      if (changes.translationLang) {
+        state.translationLang = changes.translationLang.newValue || 'en';
+        if (window.LyricTranslate) window.LyricTranslate.clearCache();
+        needsReconversion = true;
+      }
+
       if (needsReconversion && state.enabled) {
         state.cache.clear();
         clearActiveRomaji();
@@ -524,7 +946,44 @@
   function start() {
     initSettings();
     initObserver();
+    initMessageBridge();
     scheduleScan();
+  }
+
+  // The popup cannot touch the page DOM, so it asks the content script to run
+  // the export and reports back whether there was anything to export.
+  function initMessageBridge() {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (!message || message.type !== 'UTAGOE_EXPORT_VOCABULARY') return false;
+
+      let ok = false;
+      try {
+        ok = exportVocabulary();
+      } catch (err) {
+        console.warn('[Utagoe] Vocabulary export failed:', err && err.message);
+        ok = false;
+      }
+      sendResponse({ ok, count: state.lastLines.length });
+      return true;
+    });
+  }
+
+  // Test seam: the content script is an IIFE with no exports, so its internals
+  // would otherwise be reachable only by hand-testing in a browser. Exposed only
+  // when a test sets the flag before load, never in a normal page.
+  if (typeof window !== 'undefined' && window.__UTAGOE_TEST__) {
+    window.__utagoeInternals = {
+      state,
+      buildLineView,
+      upgradeRomajiElement,
+      applyTranslationLine,
+      applyConfidenceBadge,
+      openReadingEditor,
+      closeReadingEditor,
+      bindTapHandler,
+      exportVocabulary,
+      getLastLines: () => state.lastLines
+    };
   }
 
   if (document.readyState === 'loading') {

@@ -85,14 +85,24 @@ In Japanese music, artists frequently write one Kanji but sing a different readi
 ### Features
 
 - **Stacked two-line display:** the Romaji sits proportionally above the original Kanji/Kana so the Japanese lyrics stay readable.
+- **Four display modes:** Romaji, **furigana** (ruby readings over the Kanji), Hiragana, or Katakana — switchable from the popup.
+- **Tap a word to fix its reading:** every word is individually addressable. Tapping opens an inline editor, and the corrected reading is saved to your personal dictionary and used everywhere from then on.
+- **Reading confidence dots:** each line carries a dot telling you where its reading came from — green for community-verified lyrics, blue for your own corrections, amber for the ateji dictionary, grey for a machine guess.
+- **Translation line:** an optional translated line under each lyric, in ten target languages.
+- **Vocabulary export:** one click exports every Kanji word in the current song to a CSV (word, kana, romaji, source line, song) for Anki or a spreadsheet.
+- **Conjugation-aware readings:** conjugated verbs are read as words, not fragments — 溶けてゆく is *tokete yuku*, not *toke te yuku*.
 - **Validation badge:** shows whether the current track is using `[Verified (Lrclib)]` or `[Morphological transliteration]` lyrics.
 - **Click-to-seek preserved:** clicking a lyric line still jumps to that timestamp in the Spotify player.
 - **Karaoke colouring:** follows Spotify's active-line marker in real time.
 - **Interactive settings popup:**
   - Master on/off toggle.
   - Romaji font-size ratio slider (50%–90%).
+  - Display mode: Romaji, Furigana, Hiragana, Katakana.
   - Romanization system: **Hepburn** (with the macrons *ō*, *ū*) or **Passport** (plain ASCII).
   - Lrclib validator and ateji dictionary toggles.
+  - Translation on/off with a target-language picker.
+  - Tap-to-fix and confidence-dot toggles.
+  - Vocabulary export button.
   - Form for adding custom corrections.
   - Live preview.
 
@@ -105,7 +115,7 @@ In Japanese music, artists frequently write one Kanji but sing a different readi
 3. Click the **Lyrics** (microphone) button in the bottom-right of the player.
 4. The Romaji appears immediately above each Kanji line:
    ```text
-   shizumu yō ni toke te yuku yō ni    <-- Romaji on top
+   shizumu yō ni tokete yuku yō ni      <-- Romaji on top
    沈むように溶けてゆくように           <-- original Kanji below
    ```
 5. Open the extension popup to check the validation status or add a word correction.
@@ -135,22 +145,32 @@ In Japanese music, artists frequently write one Kanji but sing a different readi
 src/                       extension source (edited by hand)
   manifest.json            MV3 manifest
   content/
-    content.js             scan loop, observers, conversion pipeline
+    content.js             scan loop, observers, render pipeline, tap-to-fix UI
+    readings.js            token stream: kana, romaji, confidence, vocabulary
+    translate.js           lyric translation with caching
+    export.js              vocabulary CSV builder and downloader
     validator.js           Lrclib client, LRC parser, header stripping
     ateji.js               ateji rulebook and custom overrides
     sites/spotify.js       Spotify DOM adapter
     sites/youtubemusic.js  YouTube Music DOM adapter
   background/
-    service-worker.js      cross-origin Lrclib proxy (see note below)
+    service-worker.js      cross-origin proxies (Lrclib, translation)
   popup/                   settings UI
 build.js                   copies everything into dist/
-test/verify-extension.js   verification suite
+test/verify-extension.js   packaging and contract checks
+test/features-1.0.1.test.js  module-level feature checks
+test/render-path.test.js   content-script render path against a stub DOM
+test/browser-probe.js      loads the real extension in Chrome and renders a page
 dist/                      build output — this is what you load into the browser
 ```
 
 ### Why the service worker exists
 
-A content script inherits the page's origin, so a `fetch()` from a content script to `lrclib.net` is blocked by CORS even when the domain appears in `host_permissions`. `host_permissions` grants cross-origin access to the service worker and extension pages, not to content scripts. All Lrclib traffic therefore goes through `chrome.runtime.sendMessage` to the service worker, which performs the actual request.
+A content script inherits the page's origin, so a `fetch()` from a content script to `lrclib.net` is blocked by CORS even when the domain appears in `host_permissions`. `host_permissions` grants cross-origin access to the service worker and extension pages, not to content scripts. All Lrclib and translation traffic therefore goes through `chrome.runtime.sendMessage` to the service worker, which performs the actual request.
+
+### Test suites
+
+`npm test` runs the build, the packaging checks, the feature checks, and the render-path checks. `npm run test:browser` additionally launches a real Chrome with the built extension loaded and renders a synthetic lyrics page, which is the only check that proves the manifest is accepted and the scripts run in order.
 
 ## License
 

@@ -511,3 +511,52 @@ body {
   font-size: 11px;
   color: var(--text-secondary);
 }
+
+/* ---------------------------------------------------------------------------
+ * 1.0.1 additions: inactive language picker, vocabulary export
+ * ------------------------------------------------------------------------- */
+
+/* The language picker stays visible but dimmed while translation is off, so
+ * the popup does not jump in height when the checkbox is toggled. */
+.select-container.is-inactive {
+  opacity: 0.45;
+}
+
+.custom-select:disabled {
+  cursor: not-allowed;
+}
+
+.export-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-export-vocab {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-export-vocab:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.btn-export-vocab:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.export-hint {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}

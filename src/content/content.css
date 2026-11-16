@@ -62,3 +62,154 @@
 body.spotify-romaji-disabled .spotify-romaji-line {
   display: none !important;
 }
+
+/* ---------------------------------------------------------------------------
+ * 1.0.1 — output modes, confidence badges, translation line, tap-to-fix
+ * ------------------------------------------------------------------------- */
+
+/* Tap-to-fix needs real hit targets. The base rule disables pointer events to
+ * preserve Spotify's click-to-seek on the lyric row, so pointers are
+ * re-enabled only on the individual word spans, never on the whole line. */
+.spotify-romaji-line .utagoe-word {
+  pointer-events: auto !important;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.15s ease;
+}
+
+.spotify-romaji-line .utagoe-word:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+/* Furigana mode: ruby text sits above the kanji without inflating line height */
+.spotify-romaji-line.utagoe-furigana {
+  line-height: 2.1 !important;
+}
+
+.spotify-romaji-line.utagoe-furigana ruby {
+  ruby-position: over;
+}
+
+.spotify-romaji-line.utagoe-furigana rt {
+  font-size: 0.5em;
+  font-weight: 500;
+  opacity: 0.75;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+/* Confidence badge: a small dot whose colour states how much to trust the
+ * reading. Deliberately tiny so it never competes with the lyrics. */
+.utagoe-badge {
+  position: absolute;
+  top: 0.15em;
+  right: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  opacity: 0.55;
+  pointer-events: auto;
+  flex: 0 0 auto;
+}
+
+.utagoe-badge[data-source="verified"] { background-color: #4ade80; }
+.utagoe-badge[data-source="user"] { background-color: #60a5fa; }
+.utagoe-badge[data-source="dictionary"] { background-color: #fbbf24; }
+.utagoe-badge[data-source="auto"] { background-color: #9ca3af; }
+
+/* Translation line: dimmer than the romaji so it reads as a gloss, not a lyric */
+.utagoe-translation-line {
+  display: block !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif !important;
+  font-size: calc(var(--spotify-romaji-font-size, 0.65em) * 0.92) !important;
+  font-weight: 400 !important;
+  line-height: 1.3 !important;
+  letter-spacing: 0.01em !important;
+  opacity: 0.6 !important;
+  color: inherit !important;
+  pointer-events: none !important;
+  font-style: italic !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  word-break: break-word !important;
+}
+
+/* Inline reading editor, anchored to the tapped word */
+.utagoe-editor {
+  position: fixed;
+  top: var(--utagoe-editor-top, 50%);
+  left: var(--utagoe-editor-left, 50%);
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 190px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #1f1f1f;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #fff;
+  pointer-events: auto;
+}
+
+.utagoe-editor-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.utagoe-editor-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: #121212;
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.utagoe-editor-input:focus {
+  border-color: #4ade80;
+}
+
+.utagoe-editor-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.utagoe-editor-save,
+.utagoe-editor-cancel {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.utagoe-editor-save {
+  background: #4ade80;
+  color: #08130c;
+}
+
+.utagoe-editor-cancel {
+  background: transparent;
+  color: #b3b3b3;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* YouTube Music tiles do not expose a positioned container, so the badge keeps
+ * its normal flow position there instead of hugging the right edge. */
+.ytm-lyric-line .utagoe-badge {
+  position: static;
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: middle;
+}

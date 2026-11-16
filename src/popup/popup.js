@@ -13,6 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleValidator = document.getElementById('toggle-validator');
   const toggleAteji = document.getElementById('toggle-ateji');
 
+  const selectOutputMode = document.getElementById('select-output-mode');
+  const toggleTranslation = document.getElementById('toggle-translation');
+  const selectTranslationLang = document.getElementById('select-translation-lang');
+  const translationLangContainer = document.getElementById('translation-lang-container');
+  const toggleTapToFix = document.getElementById('toggle-tap-to-fix');
+  const toggleBadges = document.getElementById('toggle-badges');
+  const btnExportVocab = document.getElementById('btn-export-vocab');
+  const exportHint = document.getElementById('export-hint');
+
   const sourceBadge = document.getElementById('source-badge');
   const statusTrackName = document.getElementById('status-track-name');
 
@@ -138,6 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
       enableValidator: true,
       enableAteji: true,
       customOverrides: {},
+      outputMode: 'romaji',
+      tapToFix: true,
+      showBadges: true,
+      translationEnabled: false,
+      translationLang: 'en',
       lastTrackStatus: null
     },
     (items) => {
@@ -149,6 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       toggleValidator.checked = items.enableValidator !== false;
       toggleAteji.checked = items.enableAteji !== false;
+
+      selectOutputMode.value = items.outputMode || 'romaji';
+      toggleTranslation.checked = items.translationEnabled === true;
+      selectTranslationLang.value = items.translationLang || 'en';
+      toggleTapToFix.checked = items.tapToFix !== false;
+      toggleBadges.checked = items.showBadges !== false;
+      syncTranslationControls();
 
       currentOverrides = items.customOverrides || {};
       renderDictionary();
@@ -204,6 +225,71 @@ document.addEventListener('DOMContentLoaded', () => {
   toggleAteji.addEventListener('change', () => {
     chrome.storage.local.set({ enableAteji: toggleAteji.checked });
   });
+
+  // The language picker is only meaningful when translation is on, so it is
+  // dimmed and disabled rather than hidden to avoid the popup reflowing.
+  function syncTranslationControls() {
+    const on = toggleTranslation.checked;
+    selectTranslationLang.disabled = !on;
+    if (translationLangContainer) {
+      translationLangContainer.classList.toggle('is-inactive', !on);
+    }
+  }
+
+  selectOutputMode.addEventListener('change', () => {
+    chrome.storage.local.set({ outputMode: selectOutputMode.value });
+  });
+
+  toggleTranslation.addEventListener('change', () => {
+    chrome.storage.local.set({ translationEnabled: toggleTranslation.checked });
+    syncTranslationControls();
+  });
+
+  selectTranslationLang.addEventListener('change', () => {
+    chrome.storage.local.set({ translationLang: selectTranslationLang.value });
+  });
+
+  toggleTapToFix.addEventListener('change', () => {
+    chrome.storage.local.set({ tapToFix: toggleTapToFix.checked });
+  });
+
+  toggleBadges.addEventListener('change', () => {
+    chrome.storage.local.set({ showBadges: toggleBadges.checked });
+  });
+
+  /**
+   * The popup has no DOM access to the music page, so it asks the content
+   * script of the active tab to build and download the CSV. Feedback is shown
+   * in the hint line because a popup closes as soon as a download starts.
+   */
+  btnExportVocab.addEventListener('click', () => {
+    btnExportVocab.disabled = true;
+    exportHint.textContent = 'Preparing vocabulary...';
+
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs && tabs[0];
+      if (!tab || !tab.id) {
+        exportHint.textContent = 'No active tab found.';
+        btnExportVocab.disabled = false;
+        return;
+      }
+
+      chrome.tabs.sendMessage(tab.id, { type: 'UTAGOE_EXPORT_VOCABULARY' }, (res) => {
+        btnExportVocab.disabled = false;
+
+        if (chrome.runtime.lastError) {
+          exportHint.textContent = 'Open a Spotify or YouTube Music lyrics page first.';
+          return;
+        }
+        if (!res || !res.ok) {
+          exportHint.textContent = 'No lyrics loaded yet - start a song and try again.';
+          return;
+        }
+        exportHint.textContent = `Exported ${res.count} line${res.count === 1 ? '' : 's'} to CSV.`;
+      });
+    });
+  });
+
 
   // Listen to background/content status updates
   chrome.storage.onChanged.addListener((changes, area) => {
