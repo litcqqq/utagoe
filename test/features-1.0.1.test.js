@@ -295,11 +295,14 @@ async function main() {
     assert(!popupJs.includes('translationEnabled'), 'legacy translationEnabled still present in popup.js');
   });
 
-  check('version is 1.0.2 in package.json and manifest.json', () => {
+  check('package.json and manifest.json declare the same version', () => {
     const pkgVersion = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
     const manVersion = JSON.parse(readDist('manifest.json')).version;
-    assert(pkgVersion === '1.0.2', `package.json is ${pkgVersion}`);
-    assert(manVersion === '1.0.2', `manifest.json is ${manVersion}`);
+    assert(/^\d+\.\d+\.\d+$/.test(pkgVersion), `package.json version is not semver: ${pkgVersion}`);
+    assert(
+      pkgVersion === manVersion,
+      `version drift: package.json is ${pkgVersion}, manifest.json is ${manVersion}`
+    );
   });
 
   console.log('\n====================================================');
