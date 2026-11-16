@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Spotify Lyrics Romaji",
+  "version": "1.0.0",
+  "description": "Menampilkan transliterasi Romaji tepat di atas lirik Kanji/Kana pada Spotify Web Player.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://open.spotify.com/*",
+    "https://lrclib.net/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://open.spotify.com/*"
+      ],
+      "js": [
+        "lib/kuroshiro.min.js",
+        "lib/kuroshiro-analyzer-kuromoji.min.js",
+        "content/ateji.js",
+        "content/validator.js",
+        "content/content.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "dict/*",
+        "lib/*"
+      ],
+      "matches": [
+        "https://open.spotify.com/*"
+      ]
+    }
+  ]
+}
