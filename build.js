@@ -56,7 +56,10 @@ function prepareLibs() {
   // Regex to replace BrowserDictionaryLoader.prototype.loadArrayBuffer
   const targetPattern = /BrowserDictionaryLoader\.prototype\.loadArrayBuffer\s*=\s*function\s*\([^\)]*\)\s*\{[\s\S]*?xhr\.send\(\);\s*\};/;
   
+  // kuromoji builds URLs with path.join, which collapses "scheme://host" into
+  // "scheme:/host". Restore the double slash so chrome-extension:// URLs resolve.
   const fetchReplacement = `BrowserDictionaryLoader.prototype.loadArrayBuffer = function (url, callback) {
+    url = String(url).replace(/^([a-zA-Z][a-zA-Z0-9+.-]*):\\/(?!\\/)/, "$1://");
     fetch(url)
         .then(function (res) {
             if (!res.ok && res.status !== 0) {
@@ -75,7 +78,7 @@ function prepareLibs() {
 };`;
 
   if (targetPattern.test(analyzerCode)) {
-    analyzerCode = analyzerCode.replace(targetPattern, fetchReplacement);
+    analyzerCode = analyzerCode.replace(targetPattern, () => fetchReplacement);
     console.log('Successfully patched BrowserDictionaryLoader to use fetch API');
   } else {
     console.warn('Warning: Could not find BrowserDictionaryLoader pattern, using original code');

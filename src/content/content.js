@@ -33,6 +33,46 @@
   let kuroshiro = null;
   let analyzer = null;
   let kuroshiroInitPromise = null;
+  let kuroshiroFailedAt = 0;
+  const KUROSHIRO_RETRY_MS = 30000;
+
+  let observer = null;
+  let pollInterval = null;
+  let tornDown = false;
+
+  // After the extension is reloaded or updated, the old content script keeps running
+  // but every chrome.* call throws "Extension context invalidated".
+  function isContextValid() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function teardown() {
+    if (tornDown) return;
+    tornDown = true;
+    if (observer) observer.disconnect();
+    if (pollInterval) clearInterval(pollInterval);
+    if (scanTimeout) cancelAnimationFrame(scanTimeout);
+  }
+
+  function ensureContext() {
+    if (isContextValid()) return true;
+    teardown();
+    return false;
+  }
+
+  function safeStorageSet(items) {
+    if (!ensureContext()) return;
+    try {
+      const result = chrome.storage.local.set(items);
+      if (result && typeof result.catch === 'function') result.catch(() => {});
+    } catch (e) {
+      teardown();
+    }
+  }
 
   const JAPANESE_CHAR_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 
@@ -96,11 +136,12 @@
           clearActiveRomaji(adapter);
         }
       } catch (err) {
+        if (!ensureContext()) return;
         console.warn('[Lyrics-Romaji] Validator check error:', err);
       }
     }
 
-    chrome.storage.local.set({
+    safeStorageSet({
       lastTrackStatus: {
         title: state.currentTrackTitle,
         artist: state.currentArtist,
@@ -115,12 +156,16 @@
   async function initKuroshiro() {
     if (state.kuroshiroReady) return true;
     if (kuroshiroInitPromise) return kuroshiroInitPromise;
+    // Don't hammer a failing init on every DOM mutation; retry after a cooldown.
+    if (kuroshiroFailedAt && Date.now() - kuroshiroFailedAt < KUROSHIRO_RETRY_MS) return false;
+    if (!ensureContext()) return false;
 
     state.kuroshiroLoading = true;
 
     kuroshiroInitPromise = (async () => {
       try {
         if (typeof window.Kuroshiro === 'undefined' || typeof window.KuromojiAnalyzer === 'undefined') {
+          kuroshiroFailedAt = Date.now();
           return false;
         }
 
@@ -130,9 +175,16 @@
 
         await kuroshiro.init(analyzer);
         state.kuroshiroReady = true;
+        kuroshiroFailedAt = 0;
         return true;
       } catch (err) {
-        console.error('[Lyrics-Romaji] Failed to initialize Kuroshiro:', err);
+        kuroshiroFailedAt = Date.now();
+        if (!isContextValid()) {
+          teardown();
+          return false;
+        }
+        const detail = err && err.message ? err.message : String(err);
+        console.error('[Lyrics-Romaji] Failed to initialize Kuroshiro:', detail);
         return false;
       } finally {
         state.kuroshiroLoading = false;
@@ -228,6 +280,7 @@
 
   // Pindai dan proses seluruh baris lirik yang tampak melalui adaptor situs aktif
   async function scanAndProcessLyrics() {
+    if (!ensureContext()) return;
     const adapter = getActiveAdapter();
     if (!adapter) return;
 
@@ -282,9 +335,16 @@
 
   let scanTimeout = null;
   function scheduleScan() {
+    if (tornDown) return;
     if (scanTimeout) cancelAnimationFrame(scanTimeout);
     scanTimeout = requestAnimationFrame(() => {
-      scanAndProcessLyrics();
+      scanAndProcessLyrics().catch(err => {
+        if (!isContextValid()) {
+          teardown();
+          return;
+        }
+        console.warn('[Lyrics-Romaji] Scan error:', err);
+      });
     });
   }
 
@@ -294,7 +354,8 @@
       adapter.setupNavigationHooks(scheduleScan, document);
     }
 
-    const observer = new MutationObserver((mutations) => {
+    observer = new MutationObserver((mutations) => {
+      if (!ensureContext()) return;
       const currentAdapter = getActiveAdapter();
       if (!currentAdapter) return;
 
@@ -338,7 +399,8 @@
     });
 
     // Polling cadangan yang ringan: keluar lebih awal jika shelf/kontainer lirik tidak ada
-    setInterval(() => {
+    pollInterval = setInterval(() => {
+      if (!ensureContext()) return;
       const currentAdapter = getActiveAdapter();
       if (!currentAdapter) return;
 
