@@ -1,6 +1,6 @@
-# Spotify Lyrics Romaji Browser Extension 🎵🇯🇵
+# Spotify & YouTube Music Lyrics Romaji Browser Extension 🎵🇯🇵
 
-Ekstensi browser (Google Chrome, Microsoft Edge, Brave, Opera) berbasis **Manifest V3** yang secara otomatis mengonversi dan menampilkan lirik lagu Jepang berhuruf Kanji/Kana ke dalam **Romaji**, dengan format **dua baris bertingkat (Stacked Line)** di mana teks Romaji berada tepat di atas lirik aslinya.
+Ekstensi browser (Google Chrome, Microsoft Edge, Brave, Opera) berbasis **Manifest V3** yang secara otomatis mengonversi dan menampilkan lirik lagu Jepang berhuruf Kanji/Kana ke dalam **Romaji** pada **Spotify Web Player** (`open.spotify.com`) dan **YouTube Music** (`music.youtube.com`), dengan format **dua baris bertingkat (Stacked Line)** di mana teks Romaji berada tepat di atas lirik aslinya.
 
 Dilengkapi dengan **3-Layer Validation & Correction Engine** untuk mencegah kesalahan baca (*miss transliteration*) akibat fenomena **Ateji (当て字)** dalam lirik lagu Jepang.
 
@@ -74,6 +74,13 @@ Folder hasil build siap pasang berada di direktori [`dist/`](dist).
    沈むように溶けてゆくように           <-- [Kanji asli di bawah]
    ```
 5. Buka popup ekstensi di toolbar browser untuk melihat status validasi lagu atau menambahkan koreksi kata jika ada kata yang ingin disesuaikan.
+
+## Cara Penggunaan di YouTube Music
+
+1. Buka [YouTube Music](https://music.youtube.com) dan putar lagu berbahasa Jepang.
+2. Buka halaman pemutar lagu, lalu klik tab **Lyrics** di panel samping (dukungan YouTube Music mengharuskan tab **Lyrics** dibuka terlebih dahulu agar kontainer lirik dirender oleh halaman).
+3. Setiap baris lirik Jepang akan otomatis ditampilkan bertingkat dengan Romaji di bagian atas dan teks asli Jepang di bagian bawah.
+4. Saat berpindah lagu (*SPA navigation*), klik kembali tab **Lyrics** untuk menampilkan lirik beserta transliterasi Romaji pada lagu baru.
 
 ---
 
