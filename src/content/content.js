@@ -126,6 +126,7 @@
     state.currentArtist = artist;
     state.verifiedLyrics = null;
     state.currentSource = 'kuroshiro';
+    clearActiveRomaji(adapter);
 
     if (state.enableValidator && window.LyricsValidator) {
       try {
@@ -299,10 +300,16 @@
     }
 
     const rawLines = adapter.getLyricLines(container, document);
-    if (!rawLines || rawLines.length === 0) return;
+    if (!rawLines || rawLines.length === 0) {
+      clearActiveRomaji(adapter, container);
+      return;
+    }
 
     const foundJapanese = rawLines.some(line => hasJapanese(line));
-    if (!foundJapanese) return;
+    if (!foundJapanese) {
+      clearActiveRomaji(adapter, container);
+      return;
+    }
 
     if (!state.kuroshiroReady) {
       const ready = await initKuroshiro();
@@ -361,7 +368,16 @@
 
       let shouldScan = false;
       for (const m of mutations) {
-        if (m.type === 'childList' && m.addedNodes.length > 0) {
+        if (m.type === 'childList') {
+          if (
+            m.target &&
+            m.target.nodeType === Node.ELEMENT_NODE &&
+            typeof currentAdapter.shouldTriggerOnMutation === 'function' &&
+            currentAdapter.shouldTriggerOnMutation(m.target)
+          ) {
+            shouldScan = true;
+            break;
+          }
           for (const node of m.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
               if (
@@ -372,6 +388,15 @@
                 break;
               }
             }
+          }
+        } else if (m.type === 'characterData') {
+          const parent = m.target && m.target.parentElement;
+          if (
+            parent &&
+            typeof currentAdapter.shouldTriggerOnMutation === 'function' &&
+            currentAdapter.shouldTriggerOnMutation(parent)
+          ) {
+            shouldScan = true;
           }
         } else if (
           m.type === 'attributes' &&
@@ -394,6 +419,7 @@
     observer.observe(document.body, {
       childList: true,
       subtree: true,
+      characterData: true,
       attributes: true,
       attributeFilter: ['aria-selected']
     });

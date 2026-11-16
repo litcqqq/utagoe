@@ -409,6 +409,58 @@ async function main() {
       'Original lines must be preserved after injection'
     );
 
+    // Connected shelf with parentNode: renders into sibling mirror so yt-formatted-string stays intact
+    const shelfParent = {
+      childNodes: [],
+      get children() { return this.childNodes.filter(n => !n.nodeType || n.nodeType === 1); }
+    };
+    const liveDesc = {
+      nodeType: 1,
+      className: 'description style-scope ytmusic-description-shelf-renderer',
+      textContent: '君の名は\n夢灯籠',
+      attributes: {},
+      childNodes: [],
+      parentNode: shelfParent,
+      get children() { return this.childNodes.filter(n => !n.nodeType || n.nodeType === 1); },
+      setAttribute(k, v) { this.attributes[k] = String(v); },
+      getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attributes, k) ? this.attributes[k] : null; },
+      removeAttribute(k) { delete this.attributes[k]; }
+    };
+    shelfParent.childNodes.push(liveDesc);
+
+    const hasJp = s => /[\u3040-\u30ff\u4e00-\u9fff]/.test(s);
+    assert.strictEqual(ytmAdapter.needsProcessing(liveDesc, hasJp), true, 'New YTM lyrics must need processing');
+    ytmAdapter.applyRomaji(liveDesc, [
+      { text: '君の名は', romaji: 'kimi no na wa' },
+      { text: '夢灯籠', romaji: 'yume tōrō' }
+    ]);
+    assert.strictEqual(liveDesc.textContent, '君の名は\n夢灯籠', 'Source yt-formatted-string text must remain untouched');
+    assert(liveDesc.className.includes('ytm-romaji-source-hidden'), 'Source element should be hidden when mirror is active');
+    assert.strictEqual(shelfParent.children.length, 2, 'Mirror sibling should be inserted next to source');
+    const mirror = shelfParent.children[1];
+    assert.strictEqual(mirror.getAttribute('data-utagoe-mirror'), 'true');
+    assert.strictEqual(mirror.children.length, 2);
+    assert.strictEqual(mirror.children[0].childNodes[0].textContent, 'kimi no na wa');
+    assert.strictEqual(ytmAdapter.needsProcessing(liveDesc, hasJp), false, 'Mirror should be up to date');
+
+    // Simulate song change: YouTube Music updates liveDesc.textContent directly
+    liveDesc.textContent = '夜に駆ける\n騒がしい日々に';
+    assert.strictEqual(ytmAdapter.needsProcessing(liveDesc, hasJp), true, 'Changing song lyrics must trigger reprocessing');
+    assert.deepStrictEqual(ytmAdapter.getLyricLines(liveDesc), ['夜に駆ける', '騒がしい日々に']);
+    ytmAdapter.applyRomaji(liveDesc, [
+      { text: '夜に駆ける', romaji: 'yoru ni kakeru' },
+      { text: '騒がしい日々に', romaji: 'sawagashii hibi ni' }
+    ]);
+    assert.strictEqual(mirror.children[0].childNodes[0].textContent, 'yoru ni kakeru');
+    assert.strictEqual(mirror.children[1].childNodes[1].textContent, '騒がしい日々に');
+
+    // Simulate switching to a non-Japanese song and clearing
+    liveDesc.textContent = 'English lyrics only';
+    assert.strictEqual(ytmAdapter.needsProcessing(liveDesc, hasJp), true, 'Stale mirror on non-Japanese song must trigger cleanup');
+    ytmAdapter.clearRomaji(liveDesc);
+    assert.strictEqual(shelfParent.children.length, 1, 'Mirror should be removed on clear');
+    assert(!liveDesc.className.includes('ytm-romaji-source-hidden'), 'Source element should be visible again');
+
     const listeners = {};
     let hookCalls = 0;
     const hookDoc = {

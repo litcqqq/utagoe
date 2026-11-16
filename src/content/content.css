@@ -54,6 +54,10 @@
   line-height: 1.4;
 }
 
+.ytm-romaji-source-hidden {
+  display: none !important;
+}
+
 /* When the extension is toggled OFF by the user */
 body.spotify-romaji-disabled .spotify-romaji-line {
   display: none !important;

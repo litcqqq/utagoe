@@ -47,6 +47,75 @@
     }
   }
 
+  function addClass(el, cls) {
+    if (!el) return;
+    if (el.classList && typeof el.classList.add === 'function') {
+      el.classList.add(cls);
+      return;
+    }
+    const parts = (el.className || '').split(/\s+/).filter(Boolean);
+    if (!parts.includes(cls)) {
+      parts.push(cls);
+      el.className = parts.join(' ');
+    }
+  }
+
+  function removeClass(el, cls) {
+    if (!el) return;
+    if (el.classList && typeof el.classList.remove === 'function') {
+      el.classList.remove(cls);
+      return;
+    }
+    if (typeof el.className === 'string') {
+      el.className = el.className.split(/\s+/).filter(c => c && c !== cls).join(' ');
+    }
+  }
+
+  function getMirrorContainer(container) {
+    const parent = container && container.parentNode;
+    if (!parent) return null;
+    if (typeof parent.querySelector === 'function') {
+      const found = parent.querySelector('[data-utagoe-mirror="true"]');
+      if (found) return found;
+    }
+    return getChildElements(parent).find(c => getAttr(c, 'data-utagoe-mirror') === 'true') || null;
+  }
+
+  function insertAfter(parent, newEl, refEl) {
+    if (!parent || !newEl) return;
+    if (typeof parent.insertBefore === 'function') {
+      parent.insertBefore(newEl, refEl ? refEl.nextSibling || null : null);
+      return;
+    }
+    if (Array.isArray(parent.childNodes)) {
+      const existingIdx = parent.childNodes.indexOf(newEl);
+      if (existingIdx !== -1) parent.childNodes.splice(existingIdx, 1);
+      const refIdx = refEl ? parent.childNodes.indexOf(refEl) : -1;
+      if (refIdx !== -1) {
+        parent.childNodes.splice(refIdx + 1, 0, newEl);
+      } else {
+        parent.childNodes.push(newEl);
+      }
+      newEl.parentNode = parent;
+    } else if (typeof parent.appendChild === 'function') {
+      parent.appendChild(newEl);
+    }
+  }
+
+  function removeEl(el) {
+    if (!el) return;
+    if (typeof el.remove === 'function') {
+      el.remove();
+      return;
+    }
+    const parent = el.parentNode;
+    if (parent && Array.isArray(parent.childNodes)) {
+      const idx = parent.childNodes.indexOf(el);
+      if (idx !== -1) parent.childNodes.splice(idx, 1);
+      el.parentNode = null;
+    }
+  }
+
   function createEl(doc, tag) {
     const d = doc || (typeof document !== 'undefined' ? document : null);
     if (d && typeof d.createElement === 'function') {
@@ -241,16 +310,20 @@
     const target = container || getLyricsContainer(doc);
     if (!target) return [];
 
-    const existingRows = getExistingRows(target);
-    if (existingRows.length > 0) {
-      const preserved = getAttr(target, 'data-original-lyrics');
-      if (preserved !== null && preserved !== undefined && preserved.length > 0) {
-        const splitPreserved = preserved.split(/\r?\n/);
-        if (splitPreserved.length === existingRows.length) {
-          return splitPreserved;
+    // When using the sibling mirror, target (yt-formatted-string.description) is never mutated
+    // and always holds YouTube Music's live lyrics for the active song.
+    if (!target.parentNode) {
+      const existingRows = getExistingRows(target);
+      if (existingRows.length > 0) {
+        const preserved = getAttr(target, 'data-original-lyrics');
+        if (preserved !== null && preserved !== undefined && preserved.length > 0) {
+          const splitPreserved = preserved.split(/\r?\n/);
+          if (splitPreserved.length === existingRows.length) {
+            return splitPreserved;
+          }
         }
+        return existingRows.map(row => extractRowOriginalText(row));
       }
-      return existingRows.map(row => extractRowOriginalText(row));
     }
 
     const rawText = target.textContent || '';
@@ -258,12 +331,100 @@
     return rawText.split(/\r?\n/);
   }
 
+  function renderMirrorRows(renderTarget, doc, rawText, lines) {
+    const rawLines = rawText.length > 0 ? rawText.split(/\r?\n/) : [];
+    const totalLen = Math.max(rawLines.length, Array.isArray(lines) ? lines.length : 0);
+    if (totalLen === 0) return;
+
+    const pairs = [];
+    for (let i = 0; i < totalLen; i++) {
+      const item = Array.isArray(lines) ? lines[i] : undefined;
+      let originalText = rawLines[i] !== undefined ? rawLines[i] : '';
+      let romaji = '';
+
+      if (typeof item === 'string') {
+        if (rawLines.length > 0) {
+          romaji = item;
+        } else {
+          originalText = item;
+        }
+      } else if (item && typeof item === 'object') {
+        if (item.text !== undefined) originalText = item.text;
+        else if (item.original !== undefined) originalText = item.original;
+        romaji = item.romaji || '';
+      }
+
+      pairs.push({ originalText, romaji });
+    }
+
+    renderTarget.textContent = '';
+    if (Array.isArray(renderTarget.childNodes)) {
+      renderTarget.childNodes.length = 0;
+    }
+
+    for (const { originalText, romaji } of pairs) {
+      const row = createEl(doc, 'div');
+      setAttr(row, 'data-lyric-line', 'true');
+      setAttr(row, 'data-original-text', originalText);
+
+      if (originalText.trim() === '') {
+        row.className = 'ytm-lyric-line ytm-lyric-empty';
+        setAttr(row, 'data-has-romaji', 'true');
+        appendEl(renderTarget, row);
+        continue;
+      }
+
+      row.className = 'ytm-lyric-line';
+
+      if (romaji) {
+        const romajiEl = createEl(doc, 'div');
+        romajiEl.className = 'spotify-romaji-line';
+        setAttr(romajiEl, 'dir', 'auto');
+        setAttr(romajiEl, 'aria-hidden', 'true');
+        romajiEl.textContent = romaji;
+        appendEl(row, romajiEl);
+      }
+
+      const origEl = createEl(doc, 'div');
+      origEl.className = 'ytm-original-line';
+      origEl.textContent = originalText;
+      appendEl(row, origEl);
+
+      setAttr(row, 'data-has-romaji', 'true');
+      appendEl(renderTarget, row);
+    }
+  }
+
   function applyRomaji(container, lines) {
     if (!container) return;
     const doc = container.ownerDocument || (typeof document !== 'undefined' ? document : null);
+    const rawText = container.textContent || '';
+
+    // Keep yt-formatted-string.description untouched in the DOM so YouTube Music's
+    // Polymer bindings can freely update its textContent when the song changes.
+    if (container.parentNode) {
+      let mirror = getMirrorContainer(container);
+      if (mirror && getAttr(mirror, 'data-source-text') === rawText && getChildElements(mirror).length > 0) {
+        addClass(container, 'ytm-romaji-source-hidden');
+        return;
+      }
+
+      if (!mirror) {
+        mirror = createEl(doc, 'div');
+        mirror.className = 'ytm-romaji-mirror description style-scope ytmusic-description-shelf-renderer';
+        setAttr(mirror, 'data-utagoe-mirror', 'true');
+        insertAfter(container.parentNode, mirror, container);
+      }
+
+      setAttr(mirror, 'data-source-text', rawText);
+      renderMirrorRows(mirror, doc, rawText, lines);
+      addClass(container, 'ytm-romaji-source-hidden');
+      return;
+    }
+
     const existingRows = getExistingRows(container);
 
-    // If rows were rendered before, skip the ones already marked data-has-romaji="true"
+    // Fallback when container has no parentNode (e.g. detached test mock)
     if (existingRows.length > 0) {
       for (let i = 0; i < existingRows.length; i++) {
         const row = existingRows[i];
@@ -313,104 +474,54 @@
       return;
     }
 
-    // First injection: capture the original text, then split it per line (\r?\n)
-    const rawText = container.textContent || '';
-    const rawLines = rawText.length > 0 ? rawText.split(/\r?\n/) : [];
-    const totalLen = Math.max(rawLines.length, Array.isArray(lines) ? lines.length : 0);
-    if (totalLen === 0) return;
-
-    const pairs = [];
-    for (let i = 0; i < totalLen; i++) {
-      const item = Array.isArray(lines) ? lines[i] : undefined;
-      let originalText = rawLines[i] !== undefined ? rawLines[i] : '';
-      let romaji = '';
-
-      if (typeof item === 'string') {
-        if (rawLines.length > 0) {
-          romaji = item;
-        } else {
-          originalText = item;
-        }
-      } else if (item && typeof item === 'object') {
-        if (item.text !== undefined) originalText = item.text;
-        else if (item.original !== undefined) originalText = item.original;
-        romaji = item.romaji || '';
-      }
-
-      pairs.push({ originalText, romaji });
-    }
-
-    const preservedLyrics = rawText || pairs.map(p => p.originalText).join('\n');
-    setAttr(container, 'data-original-lyrics', preservedLyrics);
-
-    container.textContent = '';
-    if (Array.isArray(container.childNodes)) {
-      container.childNodes.length = 0;
-    }
-
-    for (const { originalText, romaji } of pairs) {
-      const row = createEl(doc, 'div');
-      setAttr(row, 'data-lyric-line', 'true');
-      setAttr(row, 'data-original-text', originalText);
-
-      if (originalText.trim() === '') {
-        row.className = 'ytm-lyric-line ytm-lyric-empty';
-        setAttr(row, 'data-has-romaji', 'true');
-        appendEl(container, row);
-        continue;
-      }
-
-      row.className = 'ytm-lyric-line';
-
-      if (romaji) {
-        const romajiEl = createEl(doc, 'div');
-        romajiEl.className = 'spotify-romaji-line';
-        setAttr(romajiEl, 'dir', 'auto');
-        setAttr(romajiEl, 'aria-hidden', 'true');
-        romajiEl.textContent = romaji;
-        appendEl(row, romajiEl);
-      }
-
-      const origEl = createEl(doc, 'div');
-      origEl.className = 'ytm-original-line';
-      origEl.textContent = originalText;
-      appendEl(row, origEl);
-
-      setAttr(row, 'data-has-romaji', 'true');
-      appendEl(container, row);
-    }
+    setAttr(container, 'data-original-lyrics', rawText);
+    renderMirrorRows(container, doc, rawText, lines);
   }
 
   function clearRomaji(container, doc) {
     const target = container || getLyricsContainer(doc);
-    if (!target) return;
+    if (target) {
+      const mirror = getMirrorContainer(target);
+      if (mirror) removeEl(mirror);
+      removeClass(target, 'ytm-romaji-source-hidden');
 
-    const rows = getExistingRows(target);
-    rows.forEach(row => {
-      if (typeof row.querySelector === 'function') {
-        const romajiEl = row.querySelector('.spotify-romaji-line');
-        if (romajiEl && typeof romajiEl.remove === 'function') {
-          romajiEl.remove();
-        } else if (romajiEl && Array.isArray(row.childNodes)) {
-          const idx = row.childNodes.indexOf(romajiEl);
-          if (idx !== -1) row.childNodes.splice(idx, 1);
+      const rows = getExistingRows(target);
+      rows.forEach(row => {
+        if (typeof row.querySelector === 'function') {
+          const romajiEl = row.querySelector('.spotify-romaji-line');
+          if (romajiEl) removeEl(romajiEl);
         }
-      }
-      removeAttr(row, 'data-has-romaji');
-    });
+        removeAttr(row, 'data-has-romaji');
+      });
+    }
+
+    const d = doc || (target && target.ownerDocument) || (typeof document !== 'undefined' ? document : null);
+    if (d && typeof d.querySelectorAll === 'function') {
+      d.querySelectorAll('[data-utagoe-mirror="true"]').forEach(el => removeEl(el));
+      d.querySelectorAll('.ytm-romaji-source-hidden').forEach(el => removeClass(el, 'ytm-romaji-source-hidden'));
+    }
   }
 
   function needsProcessing(container, hasJapaneseFn) {
     if (!container) return false;
+    const rawText = container.textContent || '';
+    const hasJp = typeof hasJapaneseFn === 'function' ? hasJapaneseFn(rawText) : Boolean(rawText.trim());
+
+    if (container.parentNode) {
+      const mirror = getMirrorContainer(container);
+      if (!hasJp) return Boolean(mirror);
+      if (!mirror) return true;
+      return getAttr(mirror, 'data-source-text') !== rawText;
+    }
+
     const existingRows = getExistingRows(container);
     if (existingRows.length === 0) {
-      const rawText = container.textContent || '';
-      return typeof hasJapaneseFn === 'function' ? hasJapaneseFn(rawText) : Boolean(rawText.trim());
+      return hasJp;
     }
     return existingRows.some(row => {
       const text = extractRowOriginalText(row);
-      const hasJp = typeof hasJapaneseFn === 'function' ? hasJapaneseFn(text) : Boolean(text.trim());
-      return hasJp && getAttr(row, 'data-has-romaji') !== 'true';
+      const rowHasJp = typeof hasJapaneseFn === 'function' ? hasJapaneseFn(text) : Boolean(text.trim());
+      return rowHasJp && getAttr(row, 'data-has-romaji') !== 'true';
     });
   }
 
