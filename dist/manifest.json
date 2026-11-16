@@ -19,6 +19,9 @@
   "permissions": [
     "storage"
   ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
   "host_permissions": [
     "https://open.spotify.com/*",
     "https://music.youtube.com/*",

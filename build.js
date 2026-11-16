@@ -198,6 +198,10 @@ function copySourceFiles() {
   copyDirectory(path.join(SRC_DIR, 'content'), path.join(DIST_DIR, 'content'));
   console.log('Copied content scripts & css');
 
+  // Background (service worker)
+  copyDirectory(path.join(SRC_DIR, 'background'), path.join(DIST_DIR, 'background'));
+  console.log('Copied background service worker');
+
   // Popup
   copyDirectory(path.join(SRC_DIR, 'popup'), path.join(DIST_DIR, 'popup'));
   console.log('Copied popup html, css, js');

@@ -170,6 +170,38 @@ async function main() {
     assert(!isRomanizedText('沈むように溶けてゆくように 二人だけの空が広がる夜に'), 'Should NOT mark Kanji as Romanized');
   });
 
+  // --- Test 4b: Lrclib header line must not shift romaji ---
+  test('4b. Lrclib plainLyrics header line is stripped (prevents off-by-one)', () => {
+    const { stripHeaderLines } = require(path.join(DIST_DIR, 'content', 'validator.js'));
+
+    // Bentuk nyata dari lrclib: baris pertama = "Judul - Artis"
+    const raw = ['Lemon - Kenshi Yonezu',
+                 'Yume naraba dore hodo yokatta deshou',
+                 'Imada ni anata no koto wo yume ni miru'];
+    const fixed = stripHeaderLines(raw, 'Lemon', 'Kenshi Yonezu');
+    assert.deepStrictEqual(fixed, raw.slice(1),
+      'Title header must be removed so romaji aligns with the Japanese lines');
+    assert.strictEqual(fixed[0], 'Yume naraba dore hodo yokatta deshou');
+
+    // Urutan terbalik juga harus dikenali
+    assert.deepStrictEqual(
+      stripHeaderLines(['Kenshi Yonezu - Lemon', 'aishiteru'], 'Lemon', 'Kenshi Yonezu'),
+      ['aishiteru']);
+
+    // Baris penanda struktur juga dibuang
+    assert.deepStrictEqual(
+      stripHeaderLines(['[Verse 1]', 'yume naraba'], 'Lemon', 'Kenshi Yonezu'),
+      ['yume naraba']);
+
+    // Lirik yang memang diawali judul sebagai bagian lirik tidak boleh hilang
+    const noHeader = ['kimi no na wa', 'boku no na wa'];
+    assert.deepStrictEqual(stripHeaderLines(noHeader, 'Lemon', 'Kenshi Yonezu'), noHeader);
+
+    // Tidak boleh mengembalikan daftar kosong
+    assert.deepStrictEqual(stripHeaderLines(['Lemon - Kenshi Yonezu'], 'Lemon', 'Kenshi Yonezu'),
+      ['Lemon - Kenshi Yonezu']);
+  });
+
   // --- Test 5: Stacked Line DOM Structure Simulation ---
   test('5. Stacked Line layout DOM simulation (Romaji above Kanji)', () => {
     class MockNode {
@@ -220,6 +252,32 @@ async function main() {
     assert(htmlContent.includes('id="toggle-validator"'), 'Must have validator toggle in HTML');
     assert(htmlContent.includes('id="toggle-ateji"'), 'Must have ateji toggle in HTML');
     assert(htmlContent.includes('id="form-add-override"'), 'Must have custom override form in HTML');
+  });
+
+  // --- Test 6b: Lrclib request must be proxied via service worker ---
+  test('6b. Lrclib requests are proxied through the service worker (MV3 CORS)', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(DIST_DIR, 'manifest.json'), 'utf8'));
+
+    assert(manifest.background && manifest.background.service_worker,
+      'MV3 requires a service worker; content-script fetch cannot cross origins on its own');
+
+    const swPath = path.join(DIST_DIR, manifest.background.service_worker);
+    assert(fs.existsSync(swPath), `Service worker file missing: ${manifest.background.service_worker}`);
+
+    const swCode = fs.readFileSync(swPath, 'utf8');
+    assert(swCode.includes('chrome.runtime.onMessage.addListener'),
+      'Service worker must listen for runtime messages');
+    assert(swCode.includes('lrclib.net'),
+      'Service worker must be the component that talks to Lrclib');
+
+    const validatorSrc = fs.readFileSync(path.join(DIST_DIR, 'content', 'validator.js'), 'utf8');
+    assert(validatorSrc.includes('chrome.runtime.sendMessage'),
+      'Validator must delegate to the service worker instead of fetching directly');
+
+    // Fetch langsung ke lrclib dari content script akan ditolak CORS oleh halaman.
+    const directFetch = /fetch\(\s*`https:\/\/lrclib\.net/;
+    assert(!directFetch.test(validatorSrc),
+      'Validator must not call fetch() against lrclib.net directly (CORS-blocked in content scripts)');
   });
 
   // --- Test 7: Site Adapters (Spotify & YouTube Music) ---
