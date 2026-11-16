@@ -13,7 +13,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const DIST = path.join(__dirname, '..', 'dist');
+// Point DIST at an extracted release zip to verify the artifact Master actually
+// downloads, not just the working build directory.
+const DIST = process.env.UTAGOE_DIST || path.join(__dirname, '..', 'dist');
 const net = require('net');
 
 // A fixed port is a trap: a leftover Chrome from an interrupted run keeps the
