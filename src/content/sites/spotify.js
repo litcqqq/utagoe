@@ -1,5 +1,5 @@
 /**
- * Adaptor situs untuk Spotify Web Player (open.spotify.com)
+ * Site adapter for Spotify Web Player (open.spotify.com)
  */
 
 (function (root, factory) {
@@ -106,7 +106,7 @@
       artist = (artistEl.innerText || artistEl.textContent || '').trim();
     }
 
-    // Gunakan document.title hanya sebagai cadangan jika elemen player belum siap
+    // Use document.title only as a fallback when the player element is not ready
     if (!title && d.title) {
       const parts = d.title
         .split(/[•\-–—|]/)
@@ -132,7 +132,7 @@
     return firstLine ? (firstLine.parentElement || firstLine) : null;
   }
 
-  // Ambil teks asli tanpa menyertakan elemen .spotify-romaji-line yang sudah disuntikkan
+  // Read the original text without the injected .spotify-romaji-line elements
   function extractOriginalText(lineEl) {
     if (!lineEl) return '';
     const existingRomaji = typeof lineEl.querySelector === 'function'

@@ -1,10 +1,10 @@
 /**
- * Ekstensi Lirik Romaji Jepang untuk Spotify Web & YouTube Music
- * Menampilkan Romaji bertingkat tepat di atas lirik asli Kanji/Kana.
- * Dilengkapi Validasi & Koreksi 3 Lapis:
- *  - Lapis 1: Lirik Romaji komunitas terverifikasi via Lrclib
- *  - Lapis 2: Kamus Ateji & partikel lagu lokal
- *  - Lapis 3: Kamus koreksi kustom pengguna
+ * Utagoe - Japanese Lyrics Romaji for Spotify Web & YouTube Music
+ * Renders Romaji stacked directly above the original Kanji/Kana lyrics.
+ * Backed by a 3-layer validation and correction pipeline:
+ *  - Layer 1: Community-verified Romaji lyrics from Lrclib
+ *  - Layer 2: Local ateji and lyric-particle dictionary
+ *  - Layer 3: User-defined custom correction dictionary
  */
 
 (function () {
@@ -89,7 +89,7 @@
       .trim();
   }
 
-  // Pilih adaptor situs yang cocok dengan URL aktif
+  // Pick the site adapter matching the current URL
   function getActiveAdapter() {
     const adapters = window.SiteAdapters || [
       window.SpotifySiteAdapter,
@@ -110,7 +110,7 @@
     document.querySelectorAll('[data-has-romaji]').forEach(el => el.removeAttribute('data-has-romaji'));
   }
 
-  // Periksa pergantian lagu dan kueri validator Lrclib
+  // Detect track changes and query the Lrclib validator
   async function checkTrackUpdate() {
     const adapter = getActiveAdapter();
     if (!adapter) return;
@@ -152,7 +152,7 @@
     scheduleScan();
   }
 
-  // Inisialisasi Kuroshiro dengan kamus Kuromoji lokal
+  // Initialize Kuroshiro with the bundled Kuromoji dictionary
   async function initKuroshiro() {
     if (state.kuroshiroReady) return true;
     if (kuroshiroInitPromise) return kuroshiroInitPromise;
@@ -195,7 +195,7 @@
     return kuroshiroInitPromise;
   }
 
-  // Konversi satu baris lirik dengan cache, Ateji, dan kamus pengguna
+  // Convert a single lyric line using the cache, ateji rules, and the user dictionary
   async function convertToRomaji(japaneseText, lineIndex) {
     if (state.verifiedLyrics) {
       const v = state.verifiedLyrics;
@@ -278,7 +278,7 @@
     }
   }
 
-  // Pindai dan proses seluruh baris lirik yang tampak melalui adaptor situs aktif
+  // Scan and process every visible lyric line through the active site adapter
   async function scanAndProcessLyrics() {
     if (!ensureContext()) return;
     const adapter = getActiveAdapter();
@@ -398,7 +398,7 @@
       attributeFilter: ['aria-selected']
     });
 
-    // Polling cadangan yang ringan: keluar lebih awal jika shelf/kontainer lirik tidak ada
+    // Lightweight fallback poll: bail out early when the lyrics container is absent
     pollInterval = setInterval(() => {
       if (!ensureContext()) return;
       const currentAdapter = getActiveAdapter();

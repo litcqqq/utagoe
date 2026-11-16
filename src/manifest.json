@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Spotify Lyrics Romaji",
+  "name": "Utagoe - Japanese Lyrics Romaji",
   "version": "1.0.0",
-  "description": "Menampilkan transliterasi Romaji tepat di atas lirik Kanji/Kana pada Spotify Web Player dan YouTube Music.",
+  "description": "Shows Romaji transliteration stacked directly above the original Kanji/Kana lyrics on Spotify Web Player and YouTube Music.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

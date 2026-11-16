@@ -431,6 +431,32 @@ async function main() {
     assert(hookCalls > beforeClickCalls, 'Clicking selected Lyrics tab should trigger pipeline');
   });
 
+  // --- Test 8: User-facing strings are English only ---
+  test('8. User-facing strings are English only (worldwide release)', () => {
+    // The extension ships to a worldwide audience, so nothing a user can read
+    // may stay in Indonesian. Comments are exempt: they are internal.
+    const INDONESIAN = /\b(dan|yang|untuk|dari|dengan|pada|tidak|belum|gagal|jika|karena|juga|atau|agar|sudah|masih|bisa|hanya|semua|setiap|kata|tambah|hapus|standar|kecil|siap|memutar|belum|gunakan|prioritaskan|pratinjau|bekerja|validasi|sistem|ukuran|kamus|koreksi|dipakai|menggunakan|berbentuk|terlihat)\b/i;
+
+    const htmlSrc = fs.readFileSync(path.join(DIST_DIR, 'popup', 'popup.html'), 'utf8');
+    const htmlText = htmlSrc
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<[^>]+>/g, ' ');
+    assert(!INDONESIAN.test(htmlText), `Indonesian text left in popup.html: "${htmlText.match(INDONESIAN)}"`);
+    assert(/<html lang="en">/.test(htmlSrc), 'popup.html must declare lang="en"');
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(DIST_DIR, 'manifest.json'), 'utf8'));
+    assert.strictEqual(manifest.name, 'Utagoe - Japanese Lyrics Romaji', 'Manifest name must use the Utagoe branding');
+    assert(!INDONESIAN.test(manifest.description), `Manifest description is not English: "${manifest.description}"`);
+
+    // String literals in popup.js become visible UI text (badges, tooltips).
+    const popupJs = fs.readFileSync(path.join(DIST_DIR, 'popup', 'popup.js'), 'utf8');
+    const literals = [...popupJs.matchAll(/'([^'\\\n]{3,})'/g), ...popupJs.matchAll(/`([^`\\\n]{3,})`/g)]
+      .map(m => m[1])
+      .filter(s => /\s/.test(s) || /[A-Za-z]/.test(s));
+    const offenders = literals.filter(s => INDONESIAN.test(s) && !s.includes('${'));
+    assert.deepStrictEqual(offenders, [], `Indonesian UI strings in popup.js: ${JSON.stringify(offenders)}`);
+  });
+
   console.log(`\nResults: ${passed}/${total} test suites passed cleanly.`);
 }
 

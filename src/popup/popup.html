@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spotify Romaji Lyrics</title>
+  <title>Utagoe — Japanese Lyrics Romaji</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -13,12 +13,12 @@
       <div class="brand">
         <div class="brand-icon" aria-hidden="true">R</div>
         <div class="brand-text">
-          <h1 class="brand-title">Spotify Romaji</h1>
-          <span class="brand-subtitle">Kanji ke Romaji Lyrics</span>
+          <h1 class="brand-title">Utagoe</h1>
+          <span class="brand-subtitle">Kanji to Romaji lyrics</span>
         </div>
       </div>
       <div class="header-action">
-        <label class="toggle-switch" for="toggle-enabled" title="Aktifkan / Nonaktifkan Romaji">
+        <label class="toggle-switch" for="toggle-enabled" title="Enable / disable Romaji">
           <input type="checkbox" id="toggle-enabled" checked>
           <span class="toggle-slider"></span>
         </label>
@@ -28,10 +28,10 @@
     <!-- Source Status Card -->
     <div class="status-card" id="source-status-card">
       <div class="status-card-header">
-        <span class="status-track-label">Status Validasi</span>
-        <span class="status-source-badge" id="source-badge">Siap</span>
+        <span class="status-track-label">Validation status</span>
+        <span class="status-source-badge" id="source-badge">Ready</span>
       </div>
-      <div class="status-track-title" id="status-track-name">Memutar di Spotify...</div>
+      <div class="status-track-title" id="status-track-name">Playing on Spotify...</div>
     </div>
 
     <!-- Main Settings Form -->
@@ -39,7 +39,7 @@
       <!-- Section: Display Settings -->
       <section class="setting-group">
         <div class="setting-label-row">
-          <label for="font-size-slider" class="setting-label">Ukuran Font Romaji</label>
+          <label for="font-size-slider" class="setting-label">Romaji font size</label>
           <span id="font-size-value" class="setting-value-badge">65%</span>
         </div>
         <input 
@@ -50,14 +50,14 @@
           max="90" 
           step="5" 
           value="65"
-          aria-label="Ukuran font Romaji relatif terhadap Kanji"
+          aria-label="Romaji font size relative to the Kanji line"
         >
       </section>
 
       <!-- Section: Romaji System & Casing -->
       <div class="settings-row">
         <div class="setting-group flex-1">
-          <label for="select-system" class="setting-label">Sistem</label>
+          <label for="select-system" class="setting-label">System</label>
           <div class="select-container">
             <select id="select-system" class="custom-select">
               <option value="hepburn">Hepburn (ō, ū)</option>
@@ -67,11 +67,11 @@
         </div>
 
         <div class="setting-group flex-1">
-          <label for="select-casing" class="setting-label">Format</label>
+          <label for="select-casing" class="setting-label">Case</label>
           <div class="select-container">
             <select id="select-casing" class="custom-select">
-              <option value="normal">Standar</option>
-              <option value="lowercase">Kecil</option>
+              <option value="normal">Standard</option>
+              <option value="lowercase">Lowercase</option>
             </select>
           </div>
         </div>
@@ -82,16 +82,16 @@
         <label class="checkbox-row" for="toggle-validator">
           <input type="checkbox" id="toggle-validator" checked>
           <span class="checkbox-label">
-            <strong>Gunakan Lrclib Validator</strong>
-            <span class="checkbox-desc">Prioritaskan lirik Romaji terverifikasi manusia.</span>
+            <strong>Use Lrclib validator</strong>
+            <span class="checkbox-desc">Prefer human-verified Romaji lyrics.</span>
           </span>
         </label>
 
         <label class="checkbox-row" for="toggle-ateji">
           <input type="checkbox" id="toggle-ateji" checked>
           <span class="checkbox-label">
-            <strong>Koreksi Ateji Lagu</strong>
-            <span class="checkbox-desc">Koreksi kata artistik (sadame, maji, asu, dll.).</span>
+            <strong>Correct ateji readings</strong>
+            <span class="checkbox-desc">Fix artistic readings (sadame, maji, asu, etc.).</span>
           </span>
         </label>
       </section>
@@ -99,8 +99,8 @@
       <!-- Section: Custom User Dictionary -->
       <section class="setting-group custom-dict-section">
         <div class="dict-header">
-          <span class="setting-label">Kamus Koreksi Kustom</span>
-          <span class="dict-count" id="dict-count">0 kata</span>
+          <span class="setting-label">Custom correction dictionary</span>
+          <span class="dict-count" id="dict-count">0 words</span>
         </div>
 
         <form id="form-add-override" class="dict-add-form">
@@ -108,29 +108,29 @@
             type="text" 
             id="input-kanji" 
             class="dict-input" 
-            placeholder="Kanji (misal: 運命)" 
+            placeholder="Kanji (e.g. 運命)" 
             required
-            aria-label="Kata Kanji asli"
+            aria-label="Original Kanji word"
           >
           <input 
             type="text" 
             id="input-romaji" 
             class="dict-input" 
-            placeholder="Romaji (misal: sadame)" 
+            placeholder="Romaji (e.g. sadame)" 
             required
-            aria-label="Koreksi Romaji"
+            aria-label="Romaji correction"
           >
-          <button type="submit" class="btn-add-dict" title="Tambah koreksi">Tambah</button>
+          <button type="submit" class="btn-add-dict" title="Add correction">Add</button>
         </form>
 
         <div class="dict-list-container" id="dict-list">
-          <div class="dict-empty-hint" id="dict-empty-hint">Belum ada kata koreksi kustom.</div>
+          <div class="dict-empty-hint" id="dict-empty-hint">No custom corrections yet.</div>
         </div>
       </section>
 
       <!-- Section: Live Preview -->
-      <section class="preview-section" aria-label="Pratinjau tampilan">
-        <div class="preview-label">Pratinjau Tampilan (Stacked)</div>
+      <section class="preview-section" aria-label="Display preview">
+        <div class="preview-label">Display preview (stacked)</div>
         <div class="preview-card" id="preview-box">
           <div class="preview-romaji" id="preview-romaji">shizumu yō ni toke te yuku yō ni</div>
           <div class="preview-original">沈むように溶けてゆくように</div>
@@ -142,7 +142,7 @@
     <footer class="footer">
       <div class="status-indicator">
         <span class="status-dot" aria-hidden="true"></span>
-        <span class="status-text">Bekerja di Spotify &amp; YouTube Music</span>
+        <span class="status-text">Works on Spotify &amp; YouTube Music</span>
       </div>
     </footer>
   </div>

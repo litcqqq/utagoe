@@ -15,12 +15,12 @@
   const cache = new Map();
 
   /**
-   * Transport pencarian lirik.
+   * Lyrics lookup transport.
    *
-   * Content script mewarisi origin halaman, jadi fetch() langsung ke lrclib.net
-   * diblokir CORS ("Domains, protocols and ports must match") meskipun domain
-   * sudah ada di host_permissions. Jalur yang benar adalah mengirim pesan ke
-   * service worker, yang memiliki akses lintas origin.
+   * Content scripts inherit the page origin, so a direct fetch() to lrclib.net
+   * is CORS-blocked ("Domains, protocols and ports must match") even when the
+   * domain is listed in host_permissions. The correct path is to message the
+   * service worker, which does hold cross-origin access.
    */
   async function requestSearch(query) {
     const hasRuntime = typeof chrome !== 'undefined' &&
@@ -30,12 +30,12 @@
     if (hasRuntime) {
       const res = await chrome.runtime.sendMessage({ type: 'LRCLIB_SEARCH', query });
       if (!res || typeof res !== 'object') {
-        return { ok: false, status: 0, error: 'Tidak ada respons dari service worker' };
+        return { ok: false, status: 0, error: 'No response from the service worker' };
       }
       return res;
     }
 
-    // Fallback: dipakai oleh test Node dan konteks tanpa extension runtime
+    // Fallback: used by Node tests and contexts without an extension runtime
     const url = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
     if (!res.ok) return { ok: false, status: res.status, error: `HTTP ${res.status}` };
@@ -57,9 +57,10 @@
   }
 
   /**
-   * Lrclib plainLyrics sering diawali baris judul, mis. "Lemon - Kenshi Yonezu"
-   * atau "[Verse 1]". Baris itu bukan lirik. Kalau ikut dihitung, seluruh romaji
-   * bergeser satu baris terhadap kanji-nya. Buang header sebelum dipakai.
+   * Lrclib plainLyrics often starts with a header line, e.g. "Lemon - Kenshi
+   * Yonezu" or "[Verse 1]". That line is not a lyric. If it is counted, every
+   * Romaji line shifts by one against its Kanji counterpart. Strip the header
+   * before use.
    */
   function stripHeaderLines(lines, trackName, artistName) {
     const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -69,13 +70,13 @@
     const isHeader = (line) => {
       const t = norm(line);
       if (!t) return true;
-      // Baris penanda struktur LRC
+      // LRC structure marker line
       if (/^\[.*\]$/.test(t)) return true;
-      // Kombinasi judul + artis, urutan mana pun
+      // Title + artist combination, in either order
       if (title && artist && t.includes(title) && t.includes(artist)) return true;
       if (title && t === title) return true;
 
-      // "Artist - Title" / "Title - Artist" dengan pemisah
+      // "Artist - Title" / "Title - Artist" with a separator
       const parts = t.split(/\s+[-–—|]\s+/);
       if (parts.length === 2) {
         const [a, b] = parts;
@@ -89,14 +90,14 @@
 
     let start = 0;
     while (start < lines.length && isHeader(lines[start])) start++;
-    // Jangan pernah mengosongkan seluruh daftar hanya karena heuristik header.
+    // Never empty the whole list purely because of the header heuristic.
     return start >= lines.length ? lines : lines.slice(start);
   }
 
   /**
-   * Versi stripHeaderLines untuk baris tersinkron ({timeMs, text}).
-   * Baris judul biasanya tidak punya timestamp, jadi penyaringan dilakukan
-   * berdasarkan teksnya, bukan berdasarkan waktu.
+   * stripHeaderLines variant for synced lines ({timeMs, text}).
+   * Title lines usually carry no timestamp, so filtering is done on the text
+   * rather than on time.
    */
   function stripHeaderSyncedLines(syncedLines, trackName, artistName) {
     if (!Array.isArray(syncedLines) || syncedLines.length === 0) return syncedLines;
@@ -172,8 +173,8 @@
               item.artistName || artistName
             );
 
-            // Lirik tersinkron juga bisa diawali baris judul; kalau tidak dibuang,
-            // indeks syncedLines bergeser terhadap baris kanji di halaman.
+            // Synced lyrics can start with a header line too; if it is not removed,
+            // syncedLines indices shift against the Kanji lines on the page.
             const syncedLines = item.syncedLyrics
               ? stripHeaderSyncedLines(
                   parseSyncedLrc(item.syncedLyrics),

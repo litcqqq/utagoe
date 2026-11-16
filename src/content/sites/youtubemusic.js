@@ -1,5 +1,5 @@
 /**
- * Adaptor situs untuk YouTube Music (music.youtube.com)
+ * Site adapter for YouTube Music (music.youtube.com)
  */
 
 (function (root, factory) {
@@ -125,9 +125,9 @@
     let artist = '';
     if (!d) return { title, artist };
 
-    // YouTube Music punya beberapa varian layout, dan tidak semua punya
-    // ytmusic-player-bar. Varian miniplayer/track-info memakai ytmusic-track-info;
-    // keduanya harus dicoba sebelum jatuh ke document.title.
+    // YouTube Music ships several layout variants and not all of them have a
+    // ytmusic-player-bar. The miniplayer/track-info variant uses
+    // ytmusic-track-info; both must be tried before falling back to document.title.
     const readText = (el) => (el ? (el.innerText || el.textContent || '').trim() : '');
 
     const titleSelectors = [
@@ -152,13 +152,13 @@
       if (typeof d.querySelector !== 'function') break;
       const txt = readText(d.querySelector(sel));
       if (txt) {
-        // Byline berbentuk "Artist • 1B views • 3.5M likes": ambil bagian artis saja
+        // Byline looks like "Artist • 1B views • 3.5M likes": keep the artist part only
         artist = txt.split(/[•|]/)[0].trim();
         break;
       }
     }
 
-    // Cadangan terakhir: document.title berbentuk "Song Name - Artist"
+    // Last resort: document.title has the form "Song Name - Artist"
     if (!title && d.title) {
       const cleaned = d.title.replace(/\s*-\s*YouTube Music\s*$/i, '').trim();
       const parts = cleaned.split(/\s+-\s+|\s*[•–—|]\s*/).map(s => s.trim()).filter(Boolean);
@@ -191,7 +191,7 @@
     const descriptions = shelf.querySelectorAll(DESCRIPTION_SELECTOR);
     if (!descriptions || descriptions.length === 0) return null;
 
-    // YouTube Music merender dua yt-formatted-string.description; hanya elemen terakhir yang terlihat
+    // YouTube Music renders two yt-formatted-string.description nodes; only the last one is visible
     return descriptions[descriptions.length - 1];
   }
 
@@ -263,7 +263,7 @@
     const doc = container.ownerDocument || (typeof document !== 'undefined' ? document : null);
     const existingRows = getExistingRows(container);
 
-    // Jika baris sudah dirender sebelumnya, lewati baris yang sudah berstatus data-has-romaji="true"
+    // If rows were rendered before, skip the ones already marked data-has-romaji="true"
     if (existingRows.length > 0) {
       for (let i = 0; i < existingRows.length; i++) {
         const row = existingRows[i];
@@ -313,7 +313,7 @@
       return;
     }
 
-    // Injeksi pertama: simpan teks asli lalu pecah berdasarkan baris (\r?\n)
+    // First injection: capture the original text, then split it per line (\r?\n)
     const rawText = container.textContent || '';
     const rawLines = rawText.length > 0 ? rawText.split(/\r?\n/) : [];
     const totalLen = Math.max(rawLines.length, Array.isArray(lines) ? lines.length : 0);
@@ -449,7 +449,7 @@
       }
     });
 
-    // Klik pada tab Lyrics: jalankan ulang saat aria-selected menjadi "true"
+    // Clicking the Lyrics tab: re-run once aria-selected flips to "true"
     d.addEventListener('click', (event) => {
       const tab = findLyricsTabFromTarget(event && event.target);
       if (!tab) return;

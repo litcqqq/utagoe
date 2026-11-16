@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Render Custom Overrides Dictionary List
   function renderDictionary() {
     const entries = Object.entries(currentOverrides);
-    dictCount.textContent = `${entries.length} kata`;
+    dictCount.textContent = `${entries.length} word${entries.length === 1 ? '' : 's'}`;
 
     // Clear existing item rows (keeping empty hint)
     dictList.querySelectorAll('.dict-item-row').forEach(el => el.remove());
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'dict-item-delete';
       deleteBtn.textContent = '×';
-      deleteBtn.title = `Hapus koreksi "${kanji}"`;
+      deleteBtn.title = `Remove correction "${kanji}"`;
       deleteBtn.addEventListener('click', () => {
         delete currentOverrides[kanji];
         chrome.storage.local.set({ customOverrides: currentOverrides }, () => {
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Update Status Card based on lastTrackStatus
   function updateStatusCard(trackStatus) {
     if (!trackStatus || !trackStatus.title) {
-      statusTrackName.textContent = 'Buka tab lirik di Spotify / YT Music...';
+      statusTrackName.textContent = 'Open the lyrics tab on Spotify / YT Music...';
       sourceBadge.textContent = 'Standby';
       sourceBadge.className = 'status-source-badge';
       return;
@@ -120,10 +120,10 @@ document.addEventListener('DOMContentLoaded', () => {
     statusTrackName.textContent = `${trackStatus.title}${trackStatus.artist ? ' - ' + trackStatus.artist : ''}`;
 
     if (trackStatus.source === 'lrclib') {
-      sourceBadge.textContent = 'Terverifikasi (Lrclib)';
+      sourceBadge.textContent = 'Verified (Lrclib)';
       sourceBadge.className = 'status-source-badge verified';
     } else {
-      sourceBadge.textContent = 'Transliterasi Morfologi';
+      sourceBadge.textContent = 'Morphological transliteration';
       sourceBadge.className = 'status-source-badge';
     }
   }

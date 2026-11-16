@@ -1,11 +1,11 @@
 /**
- * Service worker: cross-origin proxy untuk Lrclib.
+ * Service worker: cross-origin proxy for Lrclib.
  *
- * Content script berjalan dengan origin halaman (music.youtube.com / open.spotify.com),
- * sehingga fetch() ke lrclib.net diblokir CORS walaupun host_permissions sudah memuat
- * domain tersebut. host_permissions hanya memberi akses lintas origin kepada service
- * worker dan halaman extension, BUKAN kepada content script. Jadi permintaan jaringan
- * harus dipindahkan ke sini.
+ * Content scripts run on the page origin (music.youtube.com / open.spotify.com),
+ * so fetch() to lrclib.net is CORS-blocked even when host_permissions lists the
+ * domain. host_permissions grants cross-origin access to the service worker and
+ * extension pages only, NOT to content scripts. Network requests therefore have
+ * to be moved here.
  */
 
 const LRCLIB_ENDPOINT = 'https://lrclib.net/api';
@@ -39,7 +39,7 @@ function buildSearchUrl(query) {
 
 async function searchLrclib(query) {
   if (!query || typeof query !== 'string') {
-    return { ok: false, status: 0, error: 'Query kosong' };
+    return { ok: false, status: 0, error: 'Empty query' };
   }
 
   const cached = cacheGet(query);
@@ -68,7 +68,7 @@ async function searchLrclib(query) {
     return {
       ok: false,
       status: 0,
-      error: aborted ? 'Timeout saat menghubungi Lrclib' : String((err && err.message) || err)
+      error: aborted ? 'Timed out while contacting Lrclib' : String((err && err.message) || err)
     };
   } finally {
     clearTimeout(timer);
@@ -82,6 +82,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     .then(sendResponse)
     .catch(err => sendResponse({ ok: false, status: 0, error: String(err && err.message || err) }));
 
-  // Pertahankan channel tetap terbuka untuk respons asinkron
+  // Keep the channel open for the async response
   return true;
 });
