@@ -19,6 +19,107 @@
 
   // Matches any Unicode letter across scripts (Hiragana, Katakana, Han, Latin, etc.)
   const LETTER_REGEX = /\p{L}/u;
+  const NUMBERED_LINE_REGEX = /^\s*\{\{(\d+)\}\}\s*(.*)$/;
+
+  /**
+   * Prefix each line with its 0-based index marker (`{{i}}`) and join with `\n`.
+   * @param {string[]} lines - Sanitized lines to batch
+   * @returns {string} Numbered batch payload
+   */
+  function buildNumberedBatch(lines) {
+    return lines.map(function (line, i) {
+      return '{{' + i + '}}' + line;
+    }).join('\n');
+  }
+
+  /**
+   * Parse and strictly validate a numbered batch translation response.
+   * Returns null if any marker is missing, duplicated, out of range, or if
+   * a non-empty source line yields an empty body.
+   * @param {string} raw - Raw translated text from the endpoint
+   * @param {string[]} input - Sanitized source lines
+   * @returns {string[]|null} Validated aligned translations or null on any mismatch
+   */
+  function parseNumberedBatch(raw, input) {
+    if (typeof raw !== 'string' || !Array.isArray(input)) {
+      return null;
+    }
+
+    const n = input.length;
+    if (n === 0) {
+      return [];
+    }
+
+    const normalized = raw.replace(/([^\r\n])\s*(\{\{\d+\}\})/g, '$1\n$2');
+    const rawLines = normalized.split(/\r?\n/);
+
+    const parsedByIndex = new Map();
+    let pendingIndex = null;
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const match = NUMBERED_LINE_REGEX.exec(line);
+
+      if (match) {
+        if (pendingIndex !== null) {
+          parsedByIndex.set(pendingIndex, '');
+          pendingIndex = null;
+        }
+
+        const idx = Number(match[1]);
+        if (!Number.isInteger(idx) || String(idx) !== match[1] || idx < 0 || idx >= n) {
+          return null;
+        }
+        if (parsedByIndex.has(idx)) {
+          return null;
+        }
+
+        const body = match[2].trim();
+        if (body === '' && input[idx] !== '') {
+          pendingIndex = idx;
+        } else {
+          parsedByIndex.set(idx, body);
+        }
+      } else {
+        const trimmed = line.trim();
+        if (trimmed === '') {
+          continue;
+        }
+        if (pendingIndex !== null) {
+          parsedByIndex.set(pendingIndex, trimmed);
+          pendingIndex = null;
+        } else {
+          return null;
+        }
+      }
+    }
+
+    if (pendingIndex !== null) {
+      parsedByIndex.set(pendingIndex, '');
+      pendingIndex = null;
+    }
+
+    if (parsedByIndex.size !== n) {
+      return null;
+    }
+
+    const results = new Array(n);
+    for (let i = 0; i < n; i++) {
+      if (!parsedByIndex.has(i)) {
+        return null;
+      }
+      const body = parsedByIndex.get(i);
+      if (typeof body !== 'string') {
+        return null;
+      }
+      if (body === '' && input[i] !== '') {
+        return null;
+      }
+      results[i] = body;
+    }
+
+    return results;
+  }
 
   /**
    * Languages offered in the Utagoe translation selector UI.
@@ -171,6 +272,13 @@
     if (sanitized.length === 1) {
       const single = await fetchGoogleSingleRequest(sanitized[0], targetLang, sourceLang);
       return [single.trim()];
+    }
+
+    const numberedPayload = buildNumberedBatch(sanitized);
+    const numberedRaw = await fetchGoogleSingleRequest(numberedPayload, targetLang, sourceLang);
+    const numberedParsed = parseNumberedBatch(numberedRaw, sanitized);
+    if (numberedParsed !== null) {
+      return numberedParsed;
     }
 
     const joined = sanitized.join('\n');

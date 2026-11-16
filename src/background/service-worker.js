@@ -13,6 +13,92 @@ const GOOGLE_TRANSLATE_ENDPOINT = 'https://translate.googleapis.com/translate_a/
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 100;
 const TRANSLATE_TIMEOUT_MS = 12000;
+const NUMBERED_LINE_REGEX = /^\s*\{\{(\d+)\}\}\s*(.*)$/;
+
+function buildNumberedBatch(lines) {
+  return lines.map((line, i) => `{{${i}}}${line}`).join('\n');
+}
+
+function parseNumberedBatch(raw, input) {
+  if (typeof raw !== 'string' || !Array.isArray(input)) {
+    return null;
+  }
+
+  const n = input.length;
+  if (n === 0) {
+    return [];
+  }
+
+  const normalized = raw.replace(/([^\r\n])\s*(\{\{\d+\}\})/g, '$1\n$2');
+  const rawLines = normalized.split(/\r?\n/);
+
+  const parsedByIndex = new Map();
+  let pendingIndex = null;
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    const match = NUMBERED_LINE_REGEX.exec(line);
+
+    if (match) {
+      if (pendingIndex !== null) {
+        parsedByIndex.set(pendingIndex, '');
+        pendingIndex = null;
+      }
+
+      const idx = Number(match[1]);
+      if (!Number.isInteger(idx) || String(idx) !== match[1] || idx < 0 || idx >= n) {
+        return null;
+      }
+      if (parsedByIndex.has(idx)) {
+        return null;
+      }
+
+      const body = match[2].trim();
+      if (body === '' && input[idx] !== '') {
+        pendingIndex = idx;
+      } else {
+        parsedByIndex.set(idx, body);
+      }
+    } else {
+      const trimmed = line.trim();
+      if (trimmed === '') {
+        continue;
+      }
+      if (pendingIndex !== null) {
+        parsedByIndex.set(pendingIndex, trimmed);
+        pendingIndex = null;
+      } else {
+        return null;
+      }
+    }
+  }
+
+  if (pendingIndex !== null) {
+    parsedByIndex.set(pendingIndex, '');
+    pendingIndex = null;
+  }
+
+  if (parsedByIndex.size !== n) {
+    return null;
+  }
+
+  const results = new Array(n);
+  for (let i = 0; i < n; i++) {
+    if (!parsedByIndex.has(i)) {
+      return null;
+    }
+    const body = parsedByIndex.get(i);
+    if (typeof body !== 'string') {
+      return null;
+    }
+    if (body === '' && input[i] !== '') {
+      return null;
+    }
+    results[i] = body;
+  }
+
+  return results;
+}
 
 /** @type {Map<string, {expires: number, payload: any}>} */
 const responseCache = new Map();
@@ -127,6 +213,13 @@ async function translateTexts(texts, targetLang, sourceLang) {
     if (sanitized.length === 1) {
       const single = await requestOne(sanitized[0], controller.signal);
       return { ok: true, translations: [single.trim()] };
+    }
+
+    const numberedPayload = buildNumberedBatch(sanitized);
+    const numberedRaw = await requestOne(numberedPayload, controller.signal);
+    const numberedParsed = parseNumberedBatch(numberedRaw, sanitized);
+    if (numberedParsed !== null) {
+      return { ok: true, translations: numberedParsed };
     }
 
     const joined = sanitized.join('\n');
