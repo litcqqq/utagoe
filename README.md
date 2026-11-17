@@ -53,11 +53,11 @@ Releases are built by GitHub Actions from a tag, so nobody has to trust a zip co
 ```bash
 # 1. Bump the version in BOTH package.json and src/manifest.json
 # 2. Commit, then tag and push
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
-The [`Release`](.github/workflows/release.yml) workflow then installs dependencies, builds, runs the test suite, packages `dist/` into `utagoe-v1.0.0.zip`, and attaches it to a new GitHub Release.
+The [`Release`](.github/workflows/release.yml) workflow then installs dependencies, builds, runs the test suite, packages `dist/` into `utagoe-v1.0.1.zip`, and attaches it to a new GitHub Release.
 
 The workflow refuses to publish if:
 
