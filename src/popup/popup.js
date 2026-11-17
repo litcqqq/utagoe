@@ -36,8 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabs = [
     { key: 'display', tab: document.getElementById('tab-display'), panel: document.getElementById('panel-display') },
     { key: 'reading', tab: document.getElementById('tab-reading'), panel: document.getElementById('panel-reading') },
-    { key: 'words', tab: document.getElementById('tab-words'), panel: document.getElementById('panel-words') },
-    { key: 'export', tab: document.getElementById('tab-export'), panel: document.getElementById('panel-export') }
+    { key: 'words', tab: document.getElementById('tab-words'), panel: document.getElementById('panel-words') }
   ];
 
   function selectTab(activeKey) {
@@ -69,10 +68,138 @@ document.addEventListener('DOMContentLoaded', () => {
   // Default to Display panel on load
   selectTab('display');
 
+  // Custom Kuro Glass Dropdowns (enhances native <select> elements)
+  const customDropdownSyncs = [];
+
+  function closeAllDropdowns(exceptWrapper = null) {
+    document.querySelectorAll('.kg-dropdown.is-open').forEach((el) => {
+      if (el !== exceptWrapper) {
+        el.classList.remove('is-open');
+        const menu = el.querySelector('.kg-dropdown-menu');
+        const trigger = el.querySelector('.kg-dropdown-trigger');
+        if (menu) menu.hidden = true;
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  function initCustomDropdown(selectEl) {
+    if (!selectEl) return;
+    selectEl.classList.add('custom-select-native');
+    selectEl.tabIndex = -1;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'kg-dropdown';
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'kg-dropdown-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+
+    const triggerText = document.createElement('span');
+    const caret = document.createElement('span');
+    caret.className = 'kg-dropdown-caret';
+    caret.textContent = '▾';
+    trigger.appendChild(triggerText);
+    trigger.appendChild(caret);
+
+    const menu = document.createElement('div');
+    menu.className = 'kg-dropdown-menu';
+    menu.setAttribute('role', 'listbox');
+    menu.hidden = true;
+
+    const optionButtons = [];
+
+    function appendOption(optEl) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'kg-dropdown-option';
+      btn.setAttribute('role', 'option');
+      btn.dataset.value = optEl.value;
+
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = optEl.textContent;
+      const checkSpan = document.createElement('span');
+      checkSpan.className = 'kg-dropdown-check';
+      checkSpan.textContent = '✓';
+      checkSpan.hidden = true;
+
+      btn.appendChild(labelSpan);
+      btn.appendChild(checkSpan);
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectEl.value = optEl.value;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        sync();
+        closeAllDropdowns();
+        trigger.focus();
+      });
+
+      optionButtons.push({ btn, checkSpan, value: optEl.value, label: optEl.textContent });
+      menu.appendChild(btn);
+    }
+
+    Array.from(selectEl.children).forEach((child) => {
+      if (child.tagName === 'OPTGROUP') {
+        const divider = document.createElement('div');
+        divider.className = 'kg-dropdown-divider';
+        menu.appendChild(divider);
+
+        const groupLabel = document.createElement('div');
+        groupLabel.className = 'kg-dropdown-group-label';
+        groupLabel.textContent = child.label;
+        menu.appendChild(groupLabel);
+
+        Array.from(child.children).forEach(appendOption);
+      } else if (child.tagName === 'OPTION') {
+        appendOption(child);
+      }
+    });
+
+    function sync() {
+      const currentVal = selectEl.value;
+      const matched = optionButtons.find((item) => item.value === currentVal) || optionButtons[0];
+      if (matched) {
+        triggerText.textContent = matched.label;
+      }
+      optionButtons.forEach(({ btn, checkSpan, value }) => {
+        const isSelected = value === currentVal;
+        btn.classList.toggle('is-selected', isSelected);
+        btn.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        checkSpan.hidden = !isSelected;
+      });
+    }
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = menu.hidden;
+      closeAllDropdowns(wrapper);
+      menu.hidden = !willOpen;
+      wrapper.classList.toggle('is-open', willOpen);
+      trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(menu);
+    selectEl.parentNode.insertBefore(wrapper, selectEl.nextSibling);
+
+    sync();
+    customDropdownSyncs.push(sync);
+  }
+
+  document.addEventListener('click', () => closeAllDropdowns());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllDropdowns();
+  });
+
+  [selectOutputMode, selectSystem, selectCasing].forEach(initCustomDropdown);
+
   // Preview samples for each romanization system
   const PREVIEW_SAMPLES = {
-    hepburn: 'shizumu yō ni toke te yuku yō ni',
-    passport: 'shizumu yo ni toke te yuku yo ni'
+    hepburn: 'shizumu yō ni tokete yuku yō ni',
+    passport: 'shizumu yo ni tokete yuku yo ni'
   };
 
   let currentOverrides = {};
@@ -228,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       updateStatusCard(items.lastTrackStatus);
       updatePreview();
+      customDropdownSyncs.forEach((fn) => fn());
     }
   );
 

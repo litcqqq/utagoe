@@ -150,6 +150,26 @@ function createIcons() {
   const iconDest = path.join(DIST_DIR, 'icons');
   ensureDir(iconDest);
 
+  // Prefer hand-authored icons in src/icons/ — the generated fallback below
+  // only draws the old placeholder "R" glyph and would overwrite the real art.
+  const srcIcons = path.join(SRC_DIR, 'icons');
+  const sizes = [16, 48, 128];
+  const hasAllSrcIcons = sizes.every(size =>
+    fs.existsSync(path.join(srcIcons, `icon${size}.png`))
+  );
+
+  if (hasAllSrcIcons) {
+    sizes.forEach(size => {
+      fs.copyFileSync(
+        path.join(srcIcons, `icon${size}.png`),
+        path.join(iconDest, `icon${size}.png`)
+      );
+    });
+    console.log('Copied extension icons from src/icons (16, 48, 128)');
+    return;
+  }
+
+
   const drawIcon = (x, y, w, h) => {
     const cx = w / 2;
     const cy = h / 2;

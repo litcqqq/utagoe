@@ -88,23 +88,23 @@ In Japanese music, artists frequently write one Kanji but sing a different readi
 - **Four display modes:** Romaji, **furigana** (ruby readings over the Kanji), Hiragana, or Katakana — switchable from the popup.
 - **Tap a word to fix its reading:** every word is individually addressable. Tapping opens an inline editor, and the corrected reading is saved to your personal dictionary and used everywhere from then on.
 - **Reading confidence dots:** each line carries a dot telling you where its reading came from — green for community-verified lyrics, blue for your own corrections, amber for the ateji dictionary, grey for a machine guess.
-- **Translation line:** an optional translated line under each lyric, in ten target languages.
+- **Translation mode:** swap each lyric line in place for a translation — English, Thai, Chinese, Indonesian, Korean, Spanish, Vietnamese, French, German, or Portuguese — with no extra row and no change to the layout.
 - **Vocabulary export:** one click exports every Kanji word in the current song to a CSV (word, kana, romaji, source line, song) for Anki or a spreadsheet.
 - **Conjugation-aware readings:** conjugated verbs are read as words, not fragments — 溶けてゆく is *tokete yuku*, not *toke te yuku*.
 - **Validation badge:** shows whether the current track is using `[Verified (Lrclib)]` or `[Morphological transliteration]` lyrics.
 - **Click-to-seek preserved:** clicking a lyric line still jumps to that timestamp in the Spotify player.
 - **Karaoke colouring:** follows Spotify's active-line marker in real time.
-- **Interactive settings popup:**
-  - Master on/off toggle.
-  - Romaji font-size ratio slider (50%–90%).
-  - Display mode: Romaji, Furigana, Hiragana, Katakana.
-  - Romanization system: **Hepburn** (with the macrons *ō*, *ū*) or **Passport** (plain ASCII).
-  - Lrclib validator and ateji dictionary toggles.
-  - Translation on/off with a target-language picker.
-  - Tap-to-fix and confidence-dot toggles.
-  - Vocabulary export button.
-  - Form for adding custom corrections.
-  - Live preview.
+- **Interactive settings popup**, split into three tabs so no view scrolls:
+  - **Style** — live lyric preview, output mode (Romaji, Furigana, Hiragana, Katakana, or a translation language), romanization system (**Hepburn** with the macrons *ō*, *ū*, or **Passport** plain ASCII), letter case, and the Romaji font-size ratio (50%–90%).
+  - **Smart Fix** — tap-to-fix, confidence dots, the Lrclib validator, and the ateji dictionary.
+  - **Dictionary** — your own Kanji-to-Romaji corrections.
+  - A **CSV vocabulary export** bar pinned below the tabs, and a master on/off toggle in the header.
+
+### Popup
+
+![Style tab](docs/tab-display.png)
+![Smart Fix tab](docs/tab-reading.png)
+![Dictionary tab](docs/tab-words.png)
 
 ---
 

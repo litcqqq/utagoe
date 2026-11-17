@@ -11,22 +11,23 @@
     <!-- Header -->
     <header class="header">
       <div class="brand">
-        <div class="brand-icon" aria-hidden="true">R</div>
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 26 26" width="26" height="26" fill="none">
+            <rect x="0.5" y="0.5" width="25" height="25" rx="6.5" fill="#18181B" stroke="#F59E0B" stroke-opacity="0.38"/>
+            <rect x="6" y="5" width="8" height="3.5" rx="1.75" fill="#F59E0B"/>
+            <circle cx="18" cy="6.75" r="2" fill="#FCD34D"/>
+            <path d="M7.5 11.5V17.5C7.5 21 18.5 21 18.5 17.5V11.5" stroke="#FAFAFA" stroke-width="2.4" stroke-linecap="round"/>
+          </svg>
+        </div>
         <h1 class="brand-title">Utagoe</h1>
       </div>
-      <label class="toggle-switch" for="toggle-enabled" title="Enable or disable Romaji">
+      <label class="toggle-switch" for="toggle-enabled" title="Enable or disable Utagoe">
         <input type="checkbox" id="toggle-enabled" checked>
         <span class="toggle-slider"></span>
       </label>
     </header>
 
-    <!-- Status Strip -->
-    <div class="status-strip" title="Active song and lyric reading source">
-      <span class="status-track-title" id="status-track-name">Playing on Spotify...</span>
-      <span class="status-source-badge" id="source-badge">Ready</span>
-    </div>
-
-    <!-- Category Tab Bar -->
+    <!-- Editorial Underline Tabs -->
     <nav class="tab-bar" role="tablist" aria-label="Settings categories">
       <button
         type="button"
@@ -35,7 +36,7 @@
         class="tab-btn is-active"
         aria-selected="true"
         aria-controls="panel-display"
-      >Display</button>
+      >Style</button>
       <button
         type="button"
         role="tab"
@@ -43,7 +44,7 @@
         class="tab-btn"
         aria-selected="false"
         aria-controls="panel-reading"
-      >Reading</button>
+      >Smart Fix</button>
       <button
         type="button"
         role="tab"
@@ -51,109 +52,89 @@
         class="tab-btn"
         aria-selected="false"
         aria-controls="panel-words"
-      >Words</button>
-      <button
-        type="button"
-        role="tab"
-        id="tab-export"
-        class="tab-btn"
-        aria-selected="false"
-        aria-controls="panel-export"
-      >Export</button>
+      >Dictionary</button>
     </nav>
 
     <!-- Category Panels -->
     <main class="settings-list">
-      <!-- Display Panel -->
+      <!-- Style Panel -->
       <section
         id="panel-display"
         class="tab-panel"
         role="tabpanel"
         aria-labelledby="tab-display"
       >
-        <div class="row" title="Choose how lyrics are rendered above Japanese text">
-          <div class="row-left">
-            <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2 3.5h12M2 8h8M2 12.5h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-            </svg>
-            <label for="select-output-mode" class="row-label">Display mode</label>
-          </div>
-          <select id="select-output-mode" class="custom-select">
-            <option value="romaji">Romaji</option>
-            <option value="furigana">Furigana (ruby above kanji)</option>
-            <option value="hiragana">Hiragana</option>
-            <option value="katakana">Katakana</option>
-            <optgroup label="Translation">
-              <option value="translate:en">English translation</option>
-              <option value="translate:th">Thai translation</option>
-              <option value="translate:zh">Chinese translation (Simplified)</option>
-              <option value="translate:id">Indonesian translation</option>
-              <option value="translate:ko">Korean translation</option>
-              <option value="translate:es">Spanish translation</option>
-              <option value="translate:vi">Vietnamese translation</option>
-              <option value="translate:fr">French translation</option>
-              <option value="translate:de">German translation</option>
-              <option value="translate:pt">Portuguese translation</option>
-            </optgroup>
-          </select>
-        </div>
-
-        <div class="row" title="Romanization spelling system">
-          <div class="row-left">
-            <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M3 12L6.5 4h1L11 12M4.3 9.2h5.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            </svg>
-            <label for="select-system" class="row-label">System</label>
-          </div>
-          <select id="select-system" class="custom-select">
-            <option value="hepburn">Hepburn (ō, ū)</option>
-            <option value="passport">Passport (o, u)</option>
-          </select>
-        </div>
-
-        <div class="row" title="Letter casing for Romanized output">
-          <div class="row-left">
-            <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2.5 11.5L5.5 4.5l3 7M3.5 9.2h4M10.5 7.5v4M10.5 9a1.5 1.5 0 1 1 3 0v2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            </svg>
-            <label for="select-casing" class="row-label">Case</label>
-          </div>
-          <select id="select-casing" class="custom-select">
-            <option value="normal">Standard</option>
-            <option value="lowercase">Lowercase</option>
-          </select>
-        </div>
-
-        <div class="row row-stack" title="Romaji font size relative to the Kanji line">
-          <div class="row-top">
-            <div class="row-left">
-              <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M2.5 4h7M6 4v8M10.5 7.5h3.5M12.25 7.5v4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-              </svg>
-              <label for="font-size-slider" class="row-label">Font size</label>
-            </div>
-            <span id="font-size-value" class="setting-value-badge">65%</span>
-          </div>
-          <input
-            type="range"
-            id="font-size-slider"
-            class="range-slider"
-            min="50"
-            max="90"
-            step="5"
-            value="65"
-            aria-label="Romaji font size relative to the Kanji line"
-          >
-        </div>
-
-        <!-- Compact Live Preview -->
+        <!-- Lyric Preview & Active Track -->
         <div class="preview-card" id="preview-box" title="Live preview">
-          <div class="preview-romaji" id="preview-romaji">shizumu yō ni toke te yuku yō ni</div>
+          <div class="preview-romaji" id="preview-romaji">shizumu yō ni tokete yuku yō ni</div>
           <div class="preview-original">沈むように溶けてゆくように</div>
+          <div class="preview-meta">
+            <span class="status-track-title" id="status-track-name">Open the lyrics tab on Spotify / YT Music...</span>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <span class="status-source-badge" id="source-badge">Standby</span>
+          </div>
+        </div>
+
+        <!-- Controls Card -->
+        <div class="card-group">
+          <div class="row" title="Choose how lyrics are rendered above Japanese text">
+            <label for="select-output-mode" class="row-label">Output mode</label>
+            <select id="select-output-mode" class="custom-select">
+              <option value="romaji">Romaji</option>
+              <option value="furigana">Furigana (ruby)</option>
+              <option value="hiragana">Hiragana</option>
+              <option value="katakana">Katakana</option>
+              <optgroup label="Translation">
+                <option value="translate:en">English</option>
+                <option value="translate:th">Thai</option>
+                <option value="translate:zh">Chinese (Simplified)</option>
+                <option value="translate:id">Indonesian</option>
+                <option value="translate:ko">Korean</option>
+                <option value="translate:es">Spanish</option>
+                <option value="translate:vi">Vietnamese</option>
+                <option value="translate:fr">French</option>
+                <option value="translate:de">German</option>
+                <option value="translate:pt">Portuguese</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="row" title="Romanization spelling system">
+            <label for="select-system" class="row-label">Romanization</label>
+            <select id="select-system" class="custom-select">
+              <option value="hepburn">Hepburn (ō, ū)</option>
+              <option value="passport">Passport (o, u)</option>
+            </select>
+          </div>
+
+          <div class="row" title="Letter casing for Romanized output">
+            <label for="select-casing" class="row-label">Case</label>
+            <select id="select-casing" class="custom-select">
+              <option value="normal">Standard</option>
+              <option value="lowercase">Lowercase</option>
+            </select>
+          </div>
+
+          <div class="row row-stack" title="Romaji font size relative to the Kanji line">
+            <div class="row-top">
+              <label for="font-size-slider" class="row-label">Ruby scale</label>
+              <span id="font-size-value" class="setting-value-badge">65%</span>
+            </div>
+            <input
+              type="range"
+              id="font-size-slider"
+              class="range-slider"
+              min="50"
+              max="90"
+              step="5"
+              value="65"
+              aria-label="Romaji font size relative to the Kanji line"
+            >
+          </div>
         </div>
       </section>
 
-      <!-- Reading Panel -->
+      <!-- Smart Fix Panel -->
       <section
         id="panel-reading"
         class="tab-panel"
@@ -161,61 +142,45 @@
         aria-labelledby="tab-reading"
         hidden
       >
-        <div class="row" title="Correct any reading inline, saved to your dictionary">
-          <div class="row-left">
-            <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M10.8 2.8l2.4 2.4-7.4 7.4H3.4v-2.4l7.4-7.4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="none"/>
-            </svg>
-            <label for="toggle-tap-to-fix" class="row-label">Tap to fix</label>
+        <div class="card-group">
+          <div class="row" title="Correct any reading inline, saved to your dictionary">
+            <label for="toggle-tap-to-fix" class="row-label">Tap to fix inline</label>
+            <label class="toggle-switch" for="toggle-tap-to-fix">
+              <input type="checkbox" id="toggle-tap-to-fix" checked>
+              <span class="toggle-slider"></span>
+            </label>
           </div>
-          <label class="toggle-switch" for="toggle-tap-to-fix">
-            <input type="checkbox" id="toggle-tap-to-fix" checked>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
 
-        <div class="row" title="Green verified, blue yours, amber dictionary, grey machine">
-          <div class="row-left">
-            <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <circle cx="8" cy="8" r="4" stroke="currentColor" stroke-width="1.5" fill="none"/>
-              <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
-            </svg>
-            <label for="toggle-badges" class="row-label">Confidence dots</label>
+          <div class="row row-stack" title="Green verified, blue yours, amber dictionary, grey machine">
+            <div class="row-top">
+              <label for="toggle-badges" class="row-label">Confidence dots</label>
+              <label class="toggle-switch" for="toggle-badges">
+                <input type="checkbox" id="toggle-badges" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="row-sub">Green verified · Blue yours · Amber dict · Grey machine</div>
           </div>
-          <label class="toggle-switch" for="toggle-badges">
-            <input type="checkbox" id="toggle-badges" checked>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
 
-        <div class="row" title="Prefer human-verified Romaji lyrics from Lrclib">
-          <div class="row-left">
-            <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M3.5 8.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            </svg>
+          <div class="row" title="Prefer human-verified Romaji lyrics from Lrclib">
             <label for="toggle-validator" class="row-label">Lrclib validator</label>
+            <label class="toggle-switch" for="toggle-validator">
+              <input type="checkbox" id="toggle-validator" checked>
+              <span class="toggle-slider"></span>
+            </label>
           </div>
-          <label class="toggle-switch" for="toggle-validator">
-            <input type="checkbox" id="toggle-validator" checked>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
 
-        <div class="row" title="Fix artistic readings (sadame, maji, asu, etc.)">
-          <div class="row-left">
-            <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M8 2.5l1.6 3.4 3.7.5-2.7 2.6.6 3.7L8 11l-3.2 1.7.6-3.7-2.7-2.6 3.7-.5L8 2.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/>
-            </svg>
-            <label for="toggle-ateji" class="row-label">Ateji readings</label>
+          <div class="row" title="Fix artistic readings (sadame, maji, asu, etc.)">
+            <label for="toggle-ateji" class="row-label">Ateji readings (sadame, maji)</label>
+            <label class="toggle-switch" for="toggle-ateji">
+              <input type="checkbox" id="toggle-ateji" checked>
+              <span class="toggle-slider"></span>
+            </label>
           </div>
-          <label class="toggle-switch" for="toggle-ateji">
-            <input type="checkbox" id="toggle-ateji" checked>
-            <span class="toggle-slider"></span>
-          </label>
         </div>
       </section>
 
-      <!-- Words Panel -->
+      <!-- Dictionary Panel -->
       <section
         id="panel-words"
         class="tab-panel"
@@ -223,14 +188,9 @@
         aria-labelledby="tab-words"
         hidden
       >
-        <div class="row row-stack" title="Custom Kanji to Romaji word overrides">
+        <div class="card-group" title="Custom Kanji to Romaji word overrides">
           <div class="row-top">
-            <div class="row-left">
-              <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3.5 2.5h9v11h-9zM6 5.5h4M6 8h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              </svg>
-              <span class="row-label">Custom words</span>
-            </div>
+            <span class="row-label row-label-strong">Custom words</span>
             <span class="dict-count" id="dict-count">0 words</span>
           </div>
 
@@ -259,36 +219,15 @@
           </div>
         </div>
       </section>
-
-      <!-- Export Panel -->
-      <section
-        id="panel-export"
-        class="tab-panel"
-        role="tabpanel"
-        aria-labelledby="tab-export"
-        hidden
-      >
-        <div class="row row-stack" title="Save every kanji word in the current song for Anki or spreadsheets">
-          <div class="row-top">
-            <div class="row-left">
-              <svg class="row-icon" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M8 2.5v7.5M5.2 7.5L8 10.3l2.8-2.8M3 12.5h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              </svg>
-              <span class="row-label">Vocabulary CSV</span>
-            </div>
-            <button type="button" id="btn-export-vocab" class="btn-export-vocab">Export</button>
-          </div>
-          <div class="export-hint" id="export-hint">Saves kanji words from the active song.</div>
-        </div>
-      </section>
     </main>
 
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="status-indicator">
-        <span class="status-dot" aria-hidden="true"></span>
-        <span class="status-text">Spotify &amp; YT Music</span>
+    <!-- Persistent Export CTA -->
+    <footer class="footer-export">
+      <div class="export-bar" title="Save every kanji word in the current song for Anki or spreadsheets">
+        <span class="export-label">Export Song Vocab (CSV)</span>
+        <button type="button" id="btn-export-vocab" class="btn-export-vocab">Export</button>
       </div>
+      <div class="export-hint" id="export-hint"></div>
     </footer>
   </div>
 
