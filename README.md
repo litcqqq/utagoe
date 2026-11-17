@@ -1,22 +1,44 @@
-# Utagoe — Japanese Lyrics Romaji 🎵🇯🇵
+# Utagoe — Japanese lyrics in Romaji for Spotify and YouTube Music
 
-A **Manifest V3** browser extension (Chrome, Edge, Brave, Opera) that automatically converts Japanese lyrics written in Kanji/Kana into **Romaji** on **Spotify Web Player** (`open.spotify.com`) and **YouTube Music** (`music.youtube.com`), rendered as a **stacked two-line layout** with the Romaji sitting directly above the original line.
+[![Latest release](https://img.shields.io/github/v/release/litcqqq/utagoe?color=F59E0B&label=download)](https://github.com/litcqqq/utagoe/releases/latest)
+[![CI](https://github.com/litcqqq/utagoe/actions/workflows/release.yml/badge.svg)](https://github.com/litcqqq/utagoe/actions)
+[![License: ISC](https://img.shields.io/badge/license-ISC-F59E0B.svg)](LICENSE)
+[![Manifest V3](https://img.shields.io/badge/manifest-v3-F59E0B.svg)](https://developer.chrome.com/docs/extensions/develop/migrate)
+[![Works on](https://img.shields.io/badge/Spotify%20Web%20%C2%B7%20YouTube%20Music-F59E0B.svg)](#install)
 
-It ships with a **3-layer validation and correction engine** to avoid misreadings caused by **ateji (当て字)** — the common practice in Japanese songwriting of writing one Kanji but singing a completely different reading.
+![Utagoe: Japanese lyrics with Romaji above each line](docs/social-preview.png)
 
----
+**Karaoke for people who can't read Kanji yet.** Utagoe shows **Romaji directly above the original Japanese lyric line** on **Spotify Web Player** and **YouTube Music**, so you sing along instead of staring at characters you can't pronounce.
+
+The reason most romaji extensions let you down is **ateji (当て字)** — songwriters routinely write one Kanji and sing a completely different word. 運命 is written *unmei* but sung *sadame*. 本気 is written *honki* but sung *maji*. A dictionary converter gets both wrong. Utagoe resolves every line through **three layers** instead.
+
+![Utagoe popup: Style tab](docs/store/02-style.png)
+
+## Why this one instead of the others
+
+| | Utagoe | Typical romaji extension |
+|---|---|---|
+| Ateji-aware readings | ✅ 3-layer resolution | ❌ morphological guess only |
+| Where a reading came from | ✅ colour-coded per line | ❌ no signal |
+| Fix a wrong reading | ✅ tap the word, saved forever | ❌ impossible |
+| Furigana / Hiragana / Katakana | ✅ all three, switchable | ⚠️ usually romaji only |
+| Vocabulary export for Anki | ✅ one-click CSV | ❌ none |
+| Account, tracking, analytics | ✅ none | ⚠️ varies |
+| Runs offline after install | ✅ local engine | ⚠️ often server-based |
+
+Free, open source, no account. The dictionary runs on your machine; nothing about your listening is sent anywhere.
 
 ## Install
 
-**No Node.js required.** Grab the prebuilt zip from the [latest release](https://github.com/litcqqq/utagoe/releases/latest).
+**No Node.js, no build step.** Download the zip from the [latest release](https://github.com/litcqqq/utagoe/releases/latest), unzip it, and load it unpacked.
 
-### Chrome / Brave / Chromium
+### Chrome / Brave / Opera / Vivaldi
 1. Download `utagoe-vX.Y.Z.zip` from the latest release.
 2. Unzip it anywhere. You should see `manifest.json` sitting directly inside the folder — not nested one level deeper.
 3. Open `chrome://extensions/`.
 4. Turn on **Developer mode** (top-right).
 5. Click **Load unpacked** (top-left) and select the unzipped folder.
-6. The extension is now active.
+6. Pin Utagoe from the puzzle-piece menu so the popup is one click away.
 
 ### Microsoft Edge
 1. Open `edge://extensions/`.
@@ -25,6 +47,9 @@ It ships with a **3-layer validation and correction engine** to avoid misreading
 
 ### Updating
 Download the new zip, unzip it over the old folder, then press **Reload** on the extension card in `chrome://extensions/`.
+
+### Then
+Open **Spotify Web Player** or **YouTube Music**, play any Japanese song, and open the **Lyrics** view. Romaji appears above each line immediately.
 
 ---
 
@@ -100,11 +125,16 @@ In Japanese music, artists frequently write one Kanji but sing a different readi
   - **Dictionary** — your own Kanji-to-Romaji corrections.
   - A **CSV vocabulary export** bar pinned below the tabs, and a master on/off toggle in the header.
 
-### Popup
+### The three popup tabs
 
-![Style tab](docs/tab-display.png)
-![Smart Fix tab](docs/tab-reading.png)
-![Dictionary tab](docs/tab-words.png)
+Every reading in the app is accountable: it tells you whether it came from a human-verified lyric sheet, the ateji dictionary, your own correction, or a machine guess.
+
+![Smart Fix tab — confidence dots, tap-to-fix, Lrclib validator](docs/store/03-smart-fix.png)
+![Dictionary tab — your own Kanji to Romaji pairs](docs/store/04-dictionary.png)
+
+### When a generic converter is wrong
+
+![運命 is written unmei but sung sadame](docs/store/05-ateji.png)
 
 ---
 
@@ -126,6 +156,34 @@ In Japanese music, artists frequently write one Kanji but sing a different readi
 2. Open the track page and click the **Lyrics** tab in the side panel. The tab must be opened first, because the page only renders the lyric container once that tab is activated.
 3. Each Japanese line is automatically rendered stacked, Romaji on top and the original text below.
 4. On track change the extension rescans automatically (the `yt-navigate-finish` hook, a click on the Lyrics tab, a `MutationObserver`, and a 1.5-second poll). If the **Lyrics** tab gets closed or the lyrics have not appeared yet, reopen the tab.
+
+---
+
+## FAQ
+
+**Does it work with the Spotify desktop app or the mobile app?**
+No. Utagoe targets the **web players** only — `open.spotify.com` and `music.youtube.com` in a desktop browser. Spotify's desktop client is not a browser extension host.
+
+**Do I need Spotify Premium?**
+No. Free and Premium both show lyrics in the web player, and Utagoe only reads what is already on screen.
+
+**Does it need an internet connection?**
+Only for two optional things: the Lrclib lookup (community-verified lyrics) and translation mode. The romaji engine and its dictionary are bundled and run locally, so basic romanization works offline after install.
+
+**Why is a reading wrong on one song?**
+Because ateji is not a rule, it is an artistic choice — 未来 can be *mirai* or *asu* depending on the song. That is exactly why every line carries a confidence dot and every word is tappable. Tap it, type the right reading, and it is saved for good.
+
+**Does it send my listening data anywhere?**
+No account, no analytics, no telemetry. The only outbound requests are the track title and artist to Lrclib, and lyric text to Google Translate **only if** you switch to translation mode.
+
+**Where is the Chrome Web Store listing?**
+Not published yet — Utagoe is distributed as a release zip you load unpacked. Store review is in progress; the zip install is identical to what the store would ship.
+
+**Can I use it in Firefox?**
+Not yet. The code targets Manifest V3 on Chromium browsers (Chrome, Edge, Brave, Opera, Vivaldi). A Firefox port needs the `browser.*` namespace and a `background.scripts` fallback.
+
+**How do I contribute readings?**
+Open the Dictionary tab and add the pair, then [open an issue](https://github.com/litcqqq/utagoe/issues/new) with the song and the reading — ateji corrections that generalise get folded into the bundled dictionary for everyone.
 
 ---
 
@@ -174,4 +232,6 @@ A content script inherits the page's origin, so a `fetch()` from a content scrip
 
 ## License
 
-ISC
+ISC — see [LICENSE](LICENSE). Utagoe is an independent project, not affiliated with Spotify or YouTube.
+
+Bundled dependencies keep their own licences: [Kuroshiro](https://github.com/hexenq/kuroshiro) (MIT), [kuroshiro-analyzer-kuromoji](https://github.com/hexenq/kuroshiro-analyzer-kuromoji) (MIT), and the [Kuromoji](https://www.atilika.org/) dictionary (Apache-2.0).
