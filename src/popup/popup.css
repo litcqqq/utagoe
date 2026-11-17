@@ -22,6 +22,10 @@
   padding: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   width: 320px;
   background-color: var(--bg-base);
@@ -158,45 +162,56 @@ body {
   color: var(--badge-verified-text);
 }
 
-/* Single Container Rows & Group Labels */
-.settings-list {
-  display: flex;
-  flex-direction: column;
-  /* Chrome closes an extension popup body above ~600px, so the row list
-   * scrolls on its own (the PreMiD body pattern) instead of being clipped.
-   * 366px keeps the header, status strip, preview and footer all visible. */
-  max-height: 366px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-subtle) transparent;
+/* Category Tab Bar */
+.tab-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.settings-list::-webkit-scrollbar {
-  width: 6px;
+.tab-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 6px 4px 7px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
-.settings-list::-webkit-scrollbar-thumb {
-  background-color: var(--border-subtle);
+.tab-btn:hover {
+  color: var(--text-secondary);
+}
+
+.tab-btn.is-active,
+.tab-btn[aria-selected="true"] {
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.tab-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
   border-radius: 3px;
 }
 
-.settings-list::-webkit-scrollbar-track {
-  background: transparent;
+/* Category Panels & Rows */
+.settings-list {
+  display: flex;
+  flex-direction: column;
 }
 
-.group-label {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  margin-top: 10px;
-  margin-bottom: 2px;
-}
-
-.settings-list .group-label:first-child {
-  margin-top: 2px;
+.tab-panel {
+  display: flex;
+  flex-direction: column;
 }
 
 .row {
@@ -208,7 +223,7 @@ body {
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.settings-list > .row:last-child {
+.tab-panel > .row:last-child {
   border-bottom: none;
 }
 
@@ -460,6 +475,7 @@ body {
 
 /* Compact Live Preview */
 .preview-card {
+  margin-top: 8px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;

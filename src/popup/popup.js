@@ -32,6 +32,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewBox = document.getElementById('preview-box');
   const previewRomaji = document.getElementById('preview-romaji');
 
+  // Category Tabs & Panels
+  const tabs = [
+    { key: 'display', tab: document.getElementById('tab-display'), panel: document.getElementById('panel-display') },
+    { key: 'reading', tab: document.getElementById('tab-reading'), panel: document.getElementById('panel-reading') },
+    { key: 'words', tab: document.getElementById('tab-words'), panel: document.getElementById('panel-words') },
+    { key: 'export', tab: document.getElementById('tab-export'), panel: document.getElementById('panel-export') }
+  ];
+
+  function selectTab(activeKey) {
+    tabs.forEach(({ key, tab, panel }) => {
+      const isActive = key === activeKey;
+      tab.classList.toggle('is-active', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      panel.hidden = !isActive;
+    });
+  }
+
+  tabs.forEach(({ key, tab }, index) => {
+    tab.addEventListener('click', () => {
+      selectTab(key);
+    });
+
+    tab.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const dir = e.key === 'ArrowRight' ? 1 : -1;
+        const nextIndex = (index + dir + tabs.length) % tabs.length;
+        const nextTab = tabs[nextIndex];
+        selectTab(nextTab.key);
+        nextTab.tab.focus();
+      }
+    });
+  });
+
+  // Default to Display panel on load
+  selectTab('display');
+
   // Preview samples for each romanization system
   const PREVIEW_SAMPLES = {
     hepburn: 'shizumu yō ni toke te yuku yō ni',
@@ -268,8 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btnExportVocab.disabled = true;
     exportHint.textContent = 'Preparing vocabulary...';
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs && tabs[0];
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabsList) => {
+      const tab = tabsList && tabsList[0];
       if (!tab || !tab.id) {
         exportHint.textContent = 'No active tab found.';
         btnExportVocab.disabled = false;
@@ -291,7 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   });
-
 
   // Listen to background/content status updates
   chrome.storage.onChanged.addListener((changes, area) => {
