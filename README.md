@@ -188,6 +188,23 @@ Open the Dictionary tab and add the pair, then [open an issue](https://github.co
 
 ---
 
+## Is anyone using it?
+
+There is no install counter on a GitHub-hosted extension, so here is what is
+actually measurable, and `python3 scripts/stats.py` prints all of it:
+
+| Source | What it really tells you | Caveat |
+|---|---|---|
+| Release `download_count` | every fetch of the zip | **includes your own re-downloads, CI, bots** — not installs |
+| GitHub traffic (views/referrers) | where visitors came from | admin-only, **GitHub deletes it after 14 days** |
+| Stars / forks | interest | not usage, and the easiest thing to fake |
+| Chrome Web Store analytics | **real installs + weekly active users** | only exists once published there |
+
+GitHub can never tell you whether a downloaded zip was actually loaded into
+Chrome — the format has no install callback. Utagoe sends no telemetry by
+design, so there is no in-product signal either. That is a deliberate trade, and
+it is why every number above is a proxy except the store dashboard.
+
 ## Known limitations
 
 - **Desktop web only** (`music.youtube.com`), not the YouTube Music desktop or mobile apps.

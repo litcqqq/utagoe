@@ -272,7 +272,65 @@ above. Technical readers star repos whose design they learn from.
 
 ---
 
-## 7. What not to do
+## 7. How to tell whether anyone actually uses it
+
+There is no number anywhere that says "12 people installed this". Here is what
+each source really measures, and where each one lies to you.
+
+**GitHub release `download_count` — the only real number, and it overcounts.**
+It counts every HTTP fetch of the zip: your own re-downloads, CI jobs, link
+previewers, security scanners, and mirrors. It cannot count installs, because
+Chrome has no idea where the zip came from. Run `python3 scripts/stats.py`.
+Cumulative and permanent, so it only ever goes up — the useful signal is *change
+over a week*, not the absolute value.
+
+**GitHub traffic (views / clones / referrers) — needs admin scope, and expires.**
+`https://github.com/litcqqq/utagoe/graphs/traffic`, while signed in. This is the
+one panel that tells you *where* visitors came from, which is how you learn
+whether a Reddit post or the HN thread produced anything. **GitHub deletes this
+data after 14 days** — if you do not look, it is gone permanently. Screenshot it
+weekly during a launch.
+
+**Stars, forks, watchers — permanent, public, and a proxy for interest only.**
+A star means someone wanted to remember the repo. It is not usage. Star counts
+are also the easiest thing to fake, which is why they are the worst metric.
+
+**Chrome Web Store dashboard — the only place that counts installs.**
+Once published: *Developer Dashboard → your item → Analytics*. It gives you
+installs, weekly active users, uninstall rate, and where in the store the install
+came from (search vs. browse vs. external link). **Weekly active users is the
+number that matters** — installs with no active users means people tried it and
+left. This panel is worth more than every other source combined, and it does not
+exist until you publish.
+
+**Edge Add-ons dashboard** — same shape, free, separate number.
+
+**What you cannot measure, by design:** which user, which songs, which features.
+The extension promises no telemetry, and that promise is in the README, the store
+listing, and the privacy answers. Do not quietly add a ping to satisfy curiosity —
+one reviewer noticing a network call that was not disclosed is a store removal,
+and the trust cost is far worse than the blind spot.
+
+### What the current numbers mean
+
+As of the last check: 2 downloads on v1.0.1 and 2 on v1.0.0, 2 stars, 0 forks, 0
+issues. Those four downloads are your own verification fetches and mine — the
+genuine external install count is effectively **zero**. That is expected for a
+repo that is one day old and not listed in any store. It is not a signal about
+the product.
+
+### The honest order of operations
+
+1. Publish to the Chrome Web Store. Until then, install counts do not exist.
+2. Open the traffic page the day you post anywhere, and screenshot it.
+3. Judge a launch by *weekly active users* in the store dashboard two weeks
+   later, not by stars on the day.
+4. If installs happen but weekly actives collapse, the problem is the first
+   thirty seconds of use, not the marketing.
+
+---
+
+## 8. What not to do
 
 - Do not buy stars, use star-exchange groups, or post the same link to ten subs
   in an hour. GitHub's spam detection and Reddit's shadowban are both good at
@@ -287,7 +345,7 @@ above. Technical readers star repos whose design they learn from.
 
 ---
 
-## 8. Honest expectation setting
+## 9. Honest expectation setting
 
 Comparable projects in this exact niche, from the survey:
 
