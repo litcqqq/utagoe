@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: How do I install it?
+    url: https://github.com/litcqqq/utagoe#install
+    about: Step-by-step install for Chrome, Edge, Brave, Opera and Vivaldi. No build step needed.
+  - name: A reading is wrong on one song
+    url: https://github.com/litcqqq/utagoe/issues/new?template=wrong-reading.yml
+    about: Fix it yourself in the Dictionary tab, then report it so it ships to everyone.

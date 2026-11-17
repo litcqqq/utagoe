@@ -1,0 +1,74 @@
+name: Wrong reading
+description: A lyric line is romanized with the wrong pronunciation
+title: "[reading] <song> — <kanji> should read <romaji>"
+labels: ["reading", "dictionary"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Wrong readings are the most useful bug report this project gets. Every
+        confirmed correction can be folded into the bundled ateji dictionary, so
+        it fixes the song for everyone instead of just you.
+
+  - type: input
+    id: song
+    attributes:
+      label: Song
+      description: Title and artist
+      placeholder: YOASOBI — 夜に駆ける
+    validations:
+      required: true
+
+  - type: textarea
+    id: line
+    attributes:
+      label: The lyric line
+      description: Paste the original Japanese line, exactly as it appears
+      placeholder: 運命なんて言葉じゃ語れない
+    validations:
+      required: true
+
+  - type: input
+    id: got
+    attributes:
+      label: What Utagoe shows
+      placeholder: unmei nante kotoba ja katarenai
+    validations:
+      required: true
+
+  - type: input
+    id: expected
+    attributes:
+      label: What it should show
+      description: Write it the way it is actually sung
+      placeholder: sadame nante kotoba ja katarenai
+    validations:
+      required: true
+
+  - type: dropdown
+    id: site
+    attributes:
+      label: Where did you see it
+      options:
+        - Spotify Web Player
+        - YouTube Music
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: How do you know the reading
+      description: |
+        Optional but it decides whether the correction ships to everyone. A link
+        to the official lyric sheet, the artist's own kana, or a live performance
+        timestamp is ideal.
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        **Want it fixed right now?** Open the popup → **Dictionary** tab → add
+        the Kanji → Romaji pair. That correction applies immediately and always
+        outranks the engine.

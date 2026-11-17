@@ -1,0 +1,69 @@
+name: Bug report
+description: Something is broken, or lyrics are not rendering at all
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, check the two most common causes:
+
+        - **Nothing renders on YouTube Music** — the **Lyrics** tab has to be
+          opened in the side panel first. The page only creates the lyric
+          container once that tab is activated.
+        - **Nothing renders on Spotify** — open Spotify's own lyrics view (the
+          microphone in the player bar). Utagoe styles those lines; it does not
+          fetch lyrics by itself.
+
+  - type: input
+    id: version
+    attributes:
+      label: Utagoe version
+      description: The popup header shows it, or check the zip filename
+      placeholder: 1.0.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: site
+    attributes:
+      label: Which site
+      options:
+        - Spotify Web Player
+        - YouTube Music
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Chrome 142.0.7444.59 on Windows 11
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: Include the song if it is track-specific
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: |
+        Open DevTools (F12) → Console → reload the page → paste any red errors.
+        Utagoe logs under the `[Lyrics-Romaji]` prefix.
+      render: shell
+    validations:
+      required: false
