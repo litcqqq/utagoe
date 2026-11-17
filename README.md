@@ -16,15 +16,16 @@ The reason most romaji extensions let you down is **ateji (当て字)** — song
 
 ## Why this one instead of the others
 
-| | Utagoe | Typical romaji extension |
+| | Utagoe | Existing romaji extensions |
 |---|---|---|
 | Ateji-aware readings | ✅ 3-layer resolution | ❌ morphological guess only |
 | Where a reading came from | ✅ colour-coded per line | ❌ no signal |
-| Fix a wrong reading | ✅ tap the word, saved forever | ❌ impossible |
-| Furigana / Hiragana / Katakana | ✅ all three, switchable | ⚠️ usually romaji only |
+| Fix a wrong reading | ✅ tap the word, saved forever | ❌ not possible |
+| **YouTube Music support** | ✅ alongside Spotify | ❌ nearly all are Spotify-only |
 | Vocabulary export for Anki | ✅ one-click CSV | ❌ none |
+| Confidence you can audit | ✅ dot per line | ❌ none |
 | Account, tracking, analytics | ✅ none | ⚠️ varies |
-| Runs offline after install | ✅ local engine | ⚠️ often server-based |
+| Furigana / Hiragana / Katakana | ✅ all three | ✅ some do |
 
 Free, open source, no account. The dictionary runs on your machine; nothing about your listening is sent anywhere.
 
