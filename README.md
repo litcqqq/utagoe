@@ -10,6 +10,8 @@
 
 **Karaoke for people who can't read Kanji yet.** Utagoe shows **Romaji directly above the original Japanese lyric line** on **Spotify Web Player** and **YouTube Music**, so you sing along instead of staring at characters you can't pronounce.
 
+**Website and install guide: [litcqqq.github.io/utagoe](https://litcqqq.github.io/utagoe/)** · **[Download latest release](https://github.com/litcqqq/utagoe/releases/latest)**
+
 The reason most romaji extensions let you down is **ateji (当て字)** — songwriters routinely write one Kanji and sing a completely different word. 運命 is written *unmei* but sung *sadame*. 本気 is written *honki* but sung *maji*. A dictionary converter gets both wrong. Utagoe resolves every line through **three layers** instead.
 
 ![Utagoe popup: Style tab](docs/store/02-style.png)

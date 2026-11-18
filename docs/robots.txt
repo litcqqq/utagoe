@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://litcqqq.github.io/utagoe/sitemap.xml

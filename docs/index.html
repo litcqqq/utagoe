@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Utagoe — Romaji Lyrics for Spotify Web &amp; YouTube Music</title>
+<meta name="description" content="Free browser extension that shows Japanese lyrics in Romaji above every Kanji line on Spotify Web and YouTube Music. Ateji-aware 3-layer readings, furigana, one-click Anki export. No account, no tracking.">
+<link rel="canonical" href="https://litcqqq.github.io/utagoe/">
+<meta name="theme-color" content="#0b0b0f">
+<meta name="robots" content="index, follow, max-image-preview:large">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Utagoe">
+<meta property="og:title" content="Utagoe — Romaji Lyrics for Spotify Web &amp; YouTube Music">
+<meta property="og:description" content="Japanese lyrics in Romaji, stacked above every Kanji line. Ateji-aware readings you can correct by tapping a word. Free, open source, no account.">
+<meta property="og:url" content="https://litcqqq.github.io/utagoe/">
+<meta property="og:image" content="https://litcqqq.github.io/utagoe/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Utagoe — Romaji Lyrics for Spotify Web &amp; YouTube Music">
+<meta name="twitter:description" content="Japanese lyrics in Romaji above every Kanji line on Spotify and YouTube Music. No account, no tracking.">
+<meta name="twitter:image" content="https://litcqqq.github.io/utagoe/social-preview.png">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E6%AD%8C%3C/text%3E%3C/svg%3E">
+
+<style>
+  :root{
+    --amber:#F59E0B; --bg:#0b0b0f; --panel:#14141b;
+    --panel-2:#1b1b24; --line:#2a2a36; --text:#ececf2; --muted:#a0a0b0;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--amber); text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:940px; margin:0 auto; padding:0 22px}
+  header.hero{padding:64px 0 40px; text-align:center}
+  .eyebrow{
+    display:inline-block; font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--amber); border:1px solid var(--line); border-radius:999px;
+    padding:6px 14px; margin-bottom:22px; background:var(--panel);
+  }
+  h1{font-size:clamp(30px,5.2vw,50px); line-height:1.12; margin:0 0 18px; letter-spacing:-.02em}
+  h1 .accent{color:var(--amber)}
+  .lede{font-size:clamp(16px,2.2vw,19px); color:var(--muted); max-width:640px; margin:0 auto 30px}
+  .cta{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:18px}
+  .btn{
+    display:inline-block; padding:13px 26px; border-radius:10px; font-weight:650;
+    border:1px solid var(--line); color:var(--text); background:var(--panel);
+  }
+  .btn.primary{background:var(--amber); color:#160e00; border-color:var(--amber)}
+  .btn:hover{text-decoration:none; border-color:var(--amber)}
+  .btn.primary:hover{background:#ffb020}
+  .meta-line{font-size:13px; color:var(--muted)}
+  figure{margin:44px 0}
+  figure img{width:100%; height:auto; border-radius:14px; border:1px solid var(--line); display:block}
+  figcaption{font-size:13px; color:var(--muted); margin-top:10px; text-align:center}
+  h2{font-size:clamp(22px,3.4vw,29px); margin:64px 0 16px; letter-spacing:-.01em}
+  h3{font-size:17px; margin:26px 0 6px}
+  p{color:#d2d2de}
+  .grid{display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); margin-top:22px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px}
+  .card h3{margin:0 0 6px; font-size:15px; color:var(--amber)}
+  .card p{margin:0; font-size:14px; color:var(--muted)}
+  .demo{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:12px;
+    padding:22px 24px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:15px; line-height:2.1; color:#d8d8e4; margin:24px 0; overflow-x:auto;
+  }
+  .demo .romaji{color:var(--amber)}
+  .demo .kanji{color:#f0f0f6}
+  .demo .note{color:var(--muted); font-size:12px}
+  ol.steps{padding-left:22px; color:#d2d2de}
+  ol.steps li{margin-bottom:12px}
+  code{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:5px;
+    padding:2px 6px; font-size:.88em; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  .table-wrap{overflow-x:auto; margin:22px 0}
+  table{border-collapse:collapse; width:100%; font-size:14.5px; min-width:520px}
+  th,td{text-align:left; padding:11px 14px; border-bottom:1px solid var(--line)}
+  th{color:var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.05em}
+  td:first-child{font-weight:600}
+  .yes{color:#4ade80}
+  .no{color:#f87171}
+  details{background:var(--panel); border:1px solid var(--line); border-radius:11px; padding:15px 18px; margin-bottom:10px}
+  details summary{cursor:pointer; font-weight:600; color:var(--text)}
+  details p{margin:11px 0 0; font-size:14.5px; color:var(--muted)}
+  footer{margin-top:80px; padding:34px 0 56px; border-top:1px solid var(--line); color:var(--muted); font-size:14px; text-align:center}
+  footer a{margin:0 8px; white-space:nowrap}
+  @media (prefers-reduced-motion:no-preference){
+    .btn{transition:background .15s,border-color .15s}
+    .card{transition:border-color .15s}
+    .card:hover{border-color:#3a3a4a}
+  }
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Utagoe",
+  "alternateName": "Utagoe — Romaji Lyrics for Spotify",
+  "applicationCategory": "BrowserApplication",
+  "applicationSubCategory": "Music",
+  "operatingSystem": "Chrome, Brave, Edge, Opera, Vivaldi",
+  "url": "https://litcqqq.github.io/utagoe/",
+  "description": "Browser extension that shows Japanese lyrics in Romaji above every Kanji line on Spotify Web Player and YouTube Music, with ateji-aware three-layer readings, furigana mode, and one-click Anki vocabulary export.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "license": "https://opensource.org/licenses/ISC",
+  "softwareVersion": "1.0.1",
+  "author": { "@type": "Person", "name": "litcqqq", "url": "https://github.com/litcqqq" },
+  "downloadUrl": "https://github.com/litcqqq/utagoe/releases/latest",
+  "softwareHelp": "https://github.com/litcqqq/utagoe#readme"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I get Japanese lyrics in Romaji on Spotify Web?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Install Utagoe, open open.spotify.com, play a Japanese song, and click the Lyrics (microphone) button. Romaji appears directly above each Kanji line, without changing the player layout." }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Utagoe work with YouTube Music?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. Utagoe is one of the few Romaji extensions that supports YouTube Music as well as Spotify Web. Open a track page, click the Lyrics tab in the side panel, and each Japanese line is rendered with Romaji stacked above it." }
+    },
+    {
+      "@type": "Question",
+      "name": "Why are some Romaji readings different from the dictionary reading?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Because of ateji: songwriters often write one Kanji but sing a different word. 運命 is written unmei but sung sadame; 本気 is written honki but sung maji. Utagoe resolves each line through community-verified lyrics, a local ateji dictionary, and your own corrections, in that priority order." }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Utagoe free, and does it track me?",
+      "acceptedAnswer": { "@type": "Answer", "text": "It is free and open source under the ISC licence. There is no account, no analytics, and no telemetry. The Romaji engine and its dictionary run locally on your machine." }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">Free · Open source · No account</span>
+    <h1>Japanese lyrics in <span class="accent">Romaji</span><br>on Spotify Web &amp; YouTube Music</h1>
+    <p class="lede">
+      Utagoe stacks Romaji directly above every Kanji lyric line, so you sing along
+      instead of staring at characters you can't pronounce. Ateji-aware, and every
+      wrong reading is one tap away from being fixed forever.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/litcqqq/utagoe/releases/latest">Download for Chrome</a>
+      <a class="btn" href="https://github.com/litcqqq/utagoe">View source on GitHub</a>
+    </div>
+    <p class="meta-line">Manifest V3 · Chrome, Brave, Edge, Opera, Vivaldi · ISC licence</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <figure>
+    <img src="social-preview.png" width="1280" height="640" alt="Utagoe showing a Japanese song on Spotify with Romaji lyrics stacked above each Kanji line">
+    <figcaption>Romaji above the original line — the player layout stays untouched.</figcaption>
+  </figure>
+
+  <h2>What it actually looks like</h2>
+  <div class="demo">
+    <div><span class="romaji">shizumu yō ni tokete yuku yō ni</span> <span class="note">← Romaji on top</span></div>
+    <div><span class="kanji">沈むように溶けてゆくように</span> <span class="note">← original Kanji below</span></div>
+  </div>
+
+  <h2>Why most Romaji extensions get Japanese lyrics wrong</h2>
+  <p>
+    Because of <strong>ateji (当て字)</strong>. Songwriters routinely write one Kanji and
+    sing a completely different word — 運命 is written <em>unmei</em> but sung
+    <em>sadame</em>; 本気 is written <em>honki</em> but sung <em>maji</em>;
+    未来 is written <em>mirai</em> but sung <em>asu</em>. A dictionary converter is
+    confidently wrong on all three. Utagoe resolves every line through <strong>three
+    layers</strong> instead, highest priority first:
+  </p>
+  <ol class="steps">
+    <li><strong>Community-verified lyrics from Lrclib.</strong> If a human has uploaded
+      verified Romaji for the track, that wins — it matches what is actually sung.</li>
+    <li><strong>The local ateji and particle dictionary.</strong> Otherwise Kuroshiro
+      runs on your machine and corrects the Kanji that Japanese composers most often
+      re-read.</li>
+    <li><strong>Your own dictionary.</strong> Tap any word, type the right reading, and
+      it is stored permanently and always wins.</li>
+  </ol>
+
+  <h2>Features</h2>
+  <div class="grid">
+    <div class="card"><h3>Stacked two-line display</h3><p>Romaji sits proportionally above the original line, so the Japanese stays readable.</p></div>
+    <div class="card"><h3>Four modes</h3><p>Romaji, furigana ruby, Hiragana, or Katakana — switchable from the popup.</p></div>
+    <div class="card"><h3>Tap to fix a reading</h3><p>Every word is addressable. Correct it once, saved forever in your dictionary.</p></div>
+    <div class="card"><h3>Confidence dots</h3><p>Each line shows where its reading came from: verified, yours, ateji, or machine guess.</p></div>
+    <div class="card"><h3>YouTube Music support</h3><p>The rare Romaji extension that works on both Spotify Web and YouTube Music.</p></div>
+    <div class="card"><h3>Anki export</h3><p>One click exports every Kanji word in the song to CSV — word, kana, Romaji, line, song.</p></div>
+    <div class="card"><h3>Translation mode</h3><p>Swap each line in place for English, Indonesian, Thai, Chinese, Korean and more.</p></div>
+    <div class="card"><h3>No account, no tracking</h3><p>No analytics, no telemetry. The dictionary runs locally; nothing about your listening leaves the machine.</p></div>
+  </div>
+
+  <h2>Utagoe vs. other Romaji extensions</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>&nbsp;</th><th>Utagoe</th><th>Typical Romaji extension</th></tr></thead>
+      <tbody>
+        <tr><td>Ateji-aware readings</td><td class="yes">3-layer resolution</td><td class="no">morphological guess only</td></tr>
+        <tr><td>Source of each reading</td><td class="yes">colour-coded per line</td><td class="no">no signal</td></tr>
+        <tr><td>Fix a wrong reading</td><td class="yes">tap the word, saved forever</td><td class="no">not possible</td></tr>
+        <tr><td>YouTube Music</td><td class="yes">supported</td><td class="no">nearly all are Spotify-only</td></tr>
+        <tr><td>Anki vocabulary export</td><td class="yes">one-click CSV</td><td class="no">none</td></tr>
+        <tr><td>Account, tracking, analytics</td><td class="yes">none</td><td class="no">varies</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Install</h2>
+  <p>No Node.js and no build step. Download the zip from the latest release, unzip it, load it unpacked.</p>
+  <ol class="steps">
+    <li>Download <code>utagoe-vX.Y.Z.zip</code> from the <a href="https://github.com/litcqqq/utagoe/releases/latest">latest release</a>.</li>
+    <li>Unzip it anywhere. <code>manifest.json</code> should sit directly inside the folder, not nested one level deeper.</li>
+    <li>Open <code>chrome://extensions/</code> (or <code>edge://extensions/</code>).</li>
+    <li>Turn on <strong>Developer mode</strong>.</li>
+    <li>Click <strong>Load unpacked</strong> and select the unzipped folder.</li>
+    <li>Pin Utagoe from the puzzle-piece menu, then open Spotify Web or YouTube Music and hit Lyrics.</li>
+  </ol>
+
+  <h2>Questions</h2>
+  <details><summary>Does it work on the Spotify desktop or mobile app?</summary><p>No — Utagoe targets the web players only: <code>open.spotify.com</code> and <code>music.youtube.com</code> in a desktop browser. The desktop client is not a browser extension host.</p></details>
+  <details><summary>Do I need Spotify Premium?</summary><p>No. Free and Premium both show lyrics in the web player, and Utagoe only reads what is already on screen.</p></details>
+  <details><summary>Does it need an internet connection?</summary><p>Only for the Lrclib lookup and translation mode. The Romaji engine and its dictionary are bundled and run locally, so romanization works offline after install.</p></details>
+  <details><summary>Why is a reading wrong on one song?</summary><p>Because ateji is an artistic choice, not a rule — 未来 can be <em>mirai</em> or <em>asu</em> depending on the song. That is exactly why every line carries a confidence dot and every word is tappable.</p></details>
+  <details><summary>Does it send my listening data anywhere?</summary><p>No. No account, no analytics, no telemetry. The only outbound requests are the track title and artist to Lrclib, and lyric text to Google Translate only if you switch to translation mode.</p></details>
+  <details><summary>Can I use it in Firefox?</summary><p>Not yet. The code targets Manifest V3 on Chromium browsers. A Firefox port needs the <code>browser.*</code> namespace and a <code>background.scripts</code> fallback.</p></details>
+
+</main>
+
+<footer class="wrap">
+  <p>
+    <a href="https://github.com/litcqqq/utagoe">GitHub</a>
+    <a href="https://github.com/litcqqq/utagoe/releases">Releases</a>
+    <a href="https://github.com/litcqqq/utagoe/issues">Issues</a>
+    <a href="https://github.com/litcqqq/utagoe/blob/main/LICENSE">ISC Licence</a>
+  </p>
+  <p>Utagoe is an independent project, not affiliated with Spotify or YouTube.</p>
+</footer>
+
+</body>
+</html>
